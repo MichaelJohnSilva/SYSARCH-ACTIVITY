@@ -7,6 +7,23 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_feedback'])) {
+    $record_id = intval($_POST['record_id']);
+    $id_number = trim($_POST['id_number']);
+    $rating = intval($_POST['rating']);
+    $comments = trim($_POST['comments']);
+    
+    $feedbackStmt = $conn->prepare("INSERT INTO feedback (record_id, id_number, rating, comments) VALUES (?, ?, ?, ?)");
+    $feedbackStmt->bind_param("isis", $record_id, $id_number, $rating, $comments);
+    
+    if ($feedbackStmt->execute()) {
+        $feedback_success = true;
+    } else {
+        $feedback_error = $feedbackStmt->error;
+    }
+    $feedbackStmt->close();
+}
+
 $user_id = $_SESSION['user_id'];
 
 // Fetch user data
@@ -35,7 +52,24 @@ $stmt->execute();
 $historyResult = $stmt->get_result();
 $stmt->close();
 
+// Fetch notifications for the user
+$notifQuery = "SELECT * FROM notifications WHERE id_number = ? ORDER BY created_at DESC LIMIT 10";
+$notifStmt = $conn->prepare($notifQuery);
+$notifStmt->bind_param("s", $userIdNumber);
+$notifStmt->execute();
+$notifications = $notifStmt->get_result();
+
+// Store notifications in array before closing
+$notifications_data = [];
+if($notifications && $notifications->num_rows > 0){
+    while($n = $notifications->fetch_assoc()){
+        $notifications_data[] = $n;
+    }
+}
+$notifStmt->close();
+
 $conn->close();
+unset($conn);
 
 ?>
 <!DOCTYPE html>
@@ -160,6 +194,61 @@ $conn->close();
             transform: translateY(0);
             opacity: 1;
             pointer-events: auto;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            top: 50px;
+            right: 0;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-width: 280px;
+            max-height: 350px;
+            overflow-y: auto;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+            border-radius: 12px;
+            overflow: hidden;
+            z-index: 10000;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .notif-badge {
+            background: #eb3349;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 5px;
+        }
+
+        .notif-item {
+            display: block;
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+
+        .notif-item:last-child { border-bottom: none; }
+        .notif-item:hover { background: rgba(255,255,255,0.1); }
+        .notif-item.success { border-left: 3px solid #38ef7d; }
+        .notif-item.error { border-left: 3px solid #eb3349; }
+        .notif-item.info { border-left: 3px solid #667eea; }
+
+        .notif-icon { font-weight: 700; margin-right: 8px; }
+        .notif-item.success .notif-icon { color: #38ef7d; }
+        .notif-item.error .notif-icon { color: #eb3349; }
+        .notif-item.info .notif-icon { color: #667eea; }
+
+        .notif-time {
+            display: block;
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            margin-top: 5px;
         }
 
         .dropdown-content p {
@@ -404,6 +493,72 @@ $conn->close();
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
         }
 
+        .rating-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 10px 0;
+        }
+
+        .star-rating {
+            display: flex;
+            flex-direction: row-reverse;
+            gap: 5px;
+        }
+
+        .star-rating input {
+            display: none;
+        }
+
+        .star-rating .star {
+            font-size: 28px;
+            color: #ddd;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .star-rating .star:hover,
+        .star-rating .star:hover ~ .star,
+        .star-rating input:checked ~ .star {
+            color: #f5b301;
+            transform: scale(1.1);
+        }
+
+        .rating-label {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 25px;
+        }
+
+        .cancel-btn {
+            flex: 1;
+            padding: 14px;
+            background: #f0f0f0;
+            color: #666;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .cancel-btn:hover {
+            background: #e0e0e0;
+            transform: translateY(-2px);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
         /* ===== NO RECORDS ===== */
         .no-records {
             text-align: center;
@@ -436,18 +591,43 @@ $conn->close();
 
 <!-- NAVBAR -->
 <div class="navbar">
-    <div class="left">History Reservation</div>
+    <div class="left">History</div>
     <div class="right">
         <!-- Notification Dropdown -->
         <div class="dropdown">
-            <button class="dropdown-btn">Notifications &#9662;</button>
+            <button class="dropdown-btn">
+                Notifications 
+                <?php 
+                $unreadCount = 0;
+                foreach($notifications_data as $n){
+                    if(!$n['is_read']) $unreadCount++;
+                }
+                if($unreadCount > 0) echo '<span class="notif-badge">' . $unreadCount . '</span>';
+                ?>
+            </button>
             <div class="dropdown-content">
-                <p>No new notifications</p>
+                <?php 
+                if(count($notifications_data) > 0): 
+                    foreach($notifications_data as $notif): 
+                        $redirectUrl = ($notif['type'] === 'success') ? 'history.php' : 'reservation.php';
+                ?>
+                    <p class="notif-item <?php echo htmlspecialchars($notif['type']); ?>" onclick="window.location.href='<?php echo $redirectUrl; ?>'" style="cursor:pointer;">
+                        <span class="notif-icon"><?php echo $notif['type'] === 'success' ? '✓' : ($notif['type'] === 'error' ? '✗' : 'ℹ'); ?></span>
+                        <?php echo htmlspecialchars($notif['message']); ?>
+                        <small class="notif-time"><?php echo date("M d, h:i A", strtotime($notif['created_at'])); ?></small>
+                    </p>
+                <?php 
+                    endforeach; 
+                else: 
+                ?>
+                    <p>No new notifications</p>
+                <?php endif; ?>
             </div>
         </div>
-        <a href="dashboard.php" class="home-link">Home</a>
+        <a href="dashboard.php">Home</a>
         <a href="edit_profile.php">Edit Profile</a>
-        <a href="history.php">History Reservation</a>
+        <a href="history.php" class="active">History</a>
+        <a href="reservation.php">Reservation</a>
         <a href="logout.php">Logout</a>
     </div>
 </div>
@@ -509,28 +689,33 @@ $conn->close();
             <h3>Submit Feedback</h3>
             <span class="close" onclick="closeFeedback()">×</span>
         </div>
-        <form method="POST" action="">
+        <form method="POST" action="history.php" id="feedbackForm">
             <input type="hidden" name="record_id" id="feedbackRecordId">
             <input type="hidden" name="id_number" id="feedbackIdNumber">
             
             <div class="form-group">
-                <label>Rating</label>
-                <select name="rating" required>
-                    <option value="">Select Rating</option>
-                    <option value="5">Excellent</option>
-                    <option value="4">Good</option>
-                    <option value="3">Average</option>
-                    <option value="2">Poor</option>
-                    <option value="1">Very Poor</option>
-                </select>
+                <label>How would you rate your experience?</label>
+                <div class="rating-container">
+                    <div class="star-rating">
+                        <input type="radio" name="rating" id="star5" value="5"><label for="star5" class="star">★</label>
+                        <input type="radio" name="rating" id="star4" value="4"><label for="star4" class="star">★</label>
+                        <input type="radio" name="rating" id="star3" value="3"><label for="star3" class="star">★</label>
+                        <input type="radio" name="rating" id="star2" value="2"><label for="star2" class="star">★</label>
+                        <input type="radio" name="rating" id="star1" value="1"><label for="star1" class="star">★</label>
+                    </div>
+                    <span class="rating-label" id="ratingLabel">Select a rating</span>
+                </div>
             </div>
             
             <div class="form-group">
-                <label>Comments</label>
-                <textarea name="comments" rows="4" placeholder="Enter your feedback here..."></textarea>
+                <label>Your Comments</label>
+                <textarea name="comments" rows="4" placeholder="Tell us about your experience..."></textarea>
             </div>
             
-            <button type="submit" name="submit_feedback" class="submit-btn">Submit Feedback</button>
+            <div class="form-actions">
+                <button type="button" class="cancel-btn" onclick="closeFeedback()">Cancel</button>
+                <button type="submit" name="submit_feedback" class="submit-btn">Submit Feedback</button>
+            </div>
         </form>
     </div>
 </div>
@@ -552,6 +737,19 @@ $conn->close();
             closeFeedback();
         }
     };
+    
+    <?php if (isset($feedback_success) && $feedback_success): ?>
+        window.onload = function() {
+            alert('Thank you! Your feedback has been submitted successfully.');
+            window.location.href = 'history.php';
+        };
+    <?php endif; ?>
+    
+    <?php if (isset($feedback_error)): ?>
+        window.onload = function() {
+            alert('Error submitting feedback: <?php echo addslashes($feedback_error); ?>');
+        };
+    <?php endif; ?>
 </script>
 
 </body>

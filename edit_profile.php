@@ -63,7 +63,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $update->close();
 }
 
+// Fetch notifications for the user
+$userIdNumber = $user['id_number'];
+$notifQuery = "SELECT * FROM notifications WHERE id_number = ? ORDER BY created_at DESC LIMIT 10";
+$notifStmt = $conn->prepare($notifQuery);
+$notifStmt->bind_param("s", $userIdNumber);
+$notifStmt->execute();
+$notifications = $notifStmt->get_result();
+
+// Store notifications in array before closing
+$notifications_data = [];
+if($notifications && $notifications->num_rows > 0){
+    while($n = $notifications->fetch_assoc()){
+        $notifications_data[] = $n;
+    }
+}
+$notifStmt->close();
+
 $conn->close();
+unset($conn);
+
 ?>
 
 <!DOCTYPE html>
@@ -178,7 +197,9 @@ body {
     top: 50px;
     right: 0;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    min-width: 200px;
+    min-width: 280px;
+    max-height: 350px;
+    overflow-y: auto;
     box-shadow: 0 15px 35px rgba(0,0,0,0.4);
     border-radius: 12px;
     overflow: hidden;
@@ -187,6 +208,42 @@ body {
     transition: all 0.3s ease;
     opacity: 0;
     pointer-events: none;
+}
+
+.notif-badge {
+    background: #eb3349;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: 5px;
+}
+
+.notif-item {
+    display: block;
+    padding: 12px 15px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.3s ease;
+    cursor: default;
+}
+
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: rgba(255,255,255,0.1); }
+.notif-item.success { border-left: 3px solid #38ef7d; }
+.notif-item.error { border-left: 3px solid #eb3349; }
+.notif-item.info { border-left: 3px solid #667eea; }
+
+.notif-icon { font-weight: 700; margin-right: 8px; }
+.notif-item.success .notif-icon { color: #38ef7d; }
+.notif-item.error .notif-icon { color: #eb3349; }
+.notif-item.info .notif-icon { color: #667eea; }
+
+.notif-time {
+    display: block;
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 5px;
 }
 
 .dropdown:hover .dropdown-content {
@@ -368,17 +425,41 @@ form input[type="file"] {
 
 <!-- NAVBAR -->
 <div class="navbar">
-    <div class="logo">Dashboard</div>
+    <div class="logo">CCS Sit-in System</div>
     <ul>
          <li class="dropdown">
-            <a href="javascript:void(0)">Notifications &#9662;</a>
+            <a href="javascript:void(0)" class="dropdown-trigger">
+                Notifications 
+                <?php 
+                $unreadCount = 0;
+                foreach($notifications_data as $n){
+                    if(!$n['is_read']) $unreadCount++;
+                }
+                if($unreadCount > 0) echo '<span class="notif-badge">' . $unreadCount . '</span>';
+                ?>
+            </a>
             <div class="dropdown-content">
-                <p>No new notifications</p>
+                <?php 
+                if(count($notifications_data) > 0): 
+                    foreach($notifications_data as $notif): 
+                        $redirectUrl = ($notif['type'] === 'success') ? 'history.php' : 'reservation.php';
+                ?>
+                    <p class="notif-item <?php echo htmlspecialchars($notif['type']); ?>" onclick="window.location.href='<?php echo $redirectUrl; ?>'" style="cursor:pointer;">
+                        <span class="notif-icon"><?php echo $notif['type'] === 'success' ? '✓' : ($notif['type'] === 'error' ? '✗' : 'ℹ'); ?></span>
+                        <?php echo htmlspecialchars($notif['message']); ?>
+                        <small class="notif-time"><?php echo date("M d, h:i A", strtotime($notif['created_at'])); ?></small>
+                    </p>
+                <?php 
+                    endforeach; 
+                else: 
+                ?>
+                    <p>No new notifications</p>
+                <?php endif; ?>
             </div>
         </li>
         <li><a href="dashboard.php">Home</a></li>
-        <li><a href="edit_profile.php">Edit Profile</a></li>
-        <li><a href="history.php">History Reservation</a></li>
+        <li><a href="edit_profile.php" class="active">Edit Profile</a></li>
+        <li><a href="history.php">History</a></li>
         <li><a href="logout.php">Logout</a></li>
     
     </ul>

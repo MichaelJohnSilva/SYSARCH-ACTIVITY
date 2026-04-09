@@ -53,7 +53,24 @@ $stmt->close();
 $announcement_query = "SELECT * FROM announcements ORDER BY created_at DESC";
 $announcement_result = $conn->query($announcement_query);
 
+// Fetch notifications for the user
+$notifQuery = "SELECT * FROM notifications WHERE id_number = ? ORDER BY created_at DESC LIMIT 10";
+$notifStmt = $conn->prepare($notifQuery);
+$notifStmt->bind_param("s", $user['id_number']);
+$notifStmt->execute();
+$notifications = $notifStmt->get_result();
+
+// Store notifications in array before closing
+$notifications_data = [];
+if($notifications && $notifications->num_rows > 0){
+    while($n = $notifications->fetch_assoc()){
+        $notifications_data[] = $n;
+    }
+}
+$notifStmt->close();
+
 $conn->close();
+unset($conn);
 
 ?>
 <!DOCTYPE html>
@@ -98,8 +115,22 @@ body {
 
 .navbar .left {
     color: white;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.uc-logo {
+    height: 45px;
+    border-radius: 50%;
+    transition: transform 0.4s ease;
+    box-shadow: 0 0 15px rgba(255,255,255,0.3);
+}
+
+.uc-logo:hover {
+    transform: rotate(360deg) scale(1.1);
 }
 
 .navbar .right {
@@ -133,12 +164,25 @@ body {
 }
 
 .navbar a:hover, .dropdown-btn:hover {
-    background: rgba(255,255,255,0.1);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     transform: translateY(-2px);
 }
 
 .navbar a:hover::before {
     width: 80%;
+}
+
+.navbar a.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.navbar a.active::before {
+    display: none;
+}
+
+.navbar a.active:hover {
+    transform: translateY(-2px);
 }
 
 /* ===== NOTIFICATION DROPDOWN ===== */
@@ -154,6 +198,60 @@ body {
 
 .dropdown:hover > a {
     transform: translateY(-2px);
+}
+
+.notif-badge {
+    background: #eb3349;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: 5px;
+}
+
+.notif-item {
+    display: block;
+    padding: 12px 15px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.3s ease;
+    cursor: default;
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-item:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.notif-item.success {
+    border-left: 3px solid #38ef7d;
+}
+
+.notif-item.error {
+    border-left: 3px solid #eb3349;
+}
+
+.notif-item.info {
+    border-left: 3px solid #667eea;
+}
+
+.notif-icon {
+    font-weight: 700;
+    margin-right: 8px;
+}
+
+.notif-item.success .notif-icon { color: #38ef7d; }
+.notif-item.error .notif-icon { color: #eb3349; }
+.notif-item.info .notif-icon { color: #667eea; }
+
+.notif-time {
+    display: block;
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 5px;
 }
 
 .dropdown-content {
@@ -210,6 +308,30 @@ body {
 }
 
 /* Header full width */
+.welcome-banner {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    padding: 30px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    margin-bottom: 10px;
+}
+
+.welcome-banner h1 {
+    margin: 0 0 8px 0;
+    color: white;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.welcome-banner p {
+    margin: 0;
+    color: rgba(255,255,255,0.8);
+    font-size: 14px;
+}
+
+/* Header full width */
 .content h1,
 .content > p {
     grid-column: 1 / -1;
@@ -220,12 +342,13 @@ body {
 /* ===== PROFILE CARD ===== */
 .profile-card {
     background: white;
-    padding: 25px;
+    padding: 30px;
     border-radius: 20px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     position: sticky;
     top: 15px;
     transition: all 0.3s ease;
+    text-align: center;
 }
 
 .profile-card:hover {
@@ -234,47 +357,93 @@ body {
 }
 
 .profile-card img {
-    width: 100px;
-    height: 100px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
-    border: 3px solid #007bff;
+    border: 4px solid #667eea;
     object-fit: cover;
     transition: 0.3s;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
 }
 
 .profile-card img:hover {
-    transform: scale(1.1);
+    transform: scale(1.05);
+    border-color: #764ba2;
+}
+
+.profile-card h2 {
+    margin: 15px 0 20px 0;
+    color: #1a1a2e;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.profile-info {
+    text-align: left;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
 }
 
 .profile-info p {
-    margin: 4px 0;
+    margin: 8px 0;
     font-size: 14px;
+    color: #333;
+    display: flex;
+    justify-content: space-between;
+}
+
+.profile-info p strong {
+    color: #667eea;
+    min-width: 80px;
 }
 
 /* ===== UPLOAD ===== */
-.upload-btn input {
-    width: 100%;
-    padding: 7px;
-    margin-top: 6px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
+.upload-btn {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.upload-btn label {
+    display: inline-block;
+    padding: 10px 18px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.upload-btn label:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.upload-btn input[type="file"] {
+    display: none;
 }
 
 .upload-btn button {
-    margin-top: 6px;
-    width: 100%;
-    padding: 10px;
-    border-radius: 6px;
-    background: linear-gradient(135deg, #007bff, #0056b3);
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
     color: white;
     border: none;
-    transition: all 0.25s ease;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
     cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(56, 239, 125, 0.3);
 }
 
 .upload-btn button:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 6px 20px rgba(0,123,255,0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(56, 239, 125, 0.4);
 }
 
 /* ===== RIGHT SIDE WRAPPER ===== */
@@ -287,7 +456,7 @@ body {
 /* ===== ANNOUNCEMENTS ===== */
 .announcement {
     background: white;
-    padding: 20px;
+    padding: 25px;
     border-radius: 20px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     transition: all 0.3s ease;
@@ -303,14 +472,44 @@ body {
 .announcement h3 {
     border-left: 4px solid #667eea;
     padding-left: 12px;
-    margin: 0 0 15px 0;
+    margin: 0 0 20px 0;
     color: #1a1a2e;
+    font-size: 18px;
+    font-weight: 600;
 }
 
-.announcement p {
+.announcement-item {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.announcement-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+}
+
+.announcement-item:last-child {
+    margin-bottom: 0;
+}
+
+.announcement-item p {
     margin: 5px 0;
     font-size: 14px;
     color: #555;
+}
+
+.announcement-item p strong {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.announcement-item hr {
+    border: none;
+    border-top: 1px solid rgba(102, 126, 234, 0.2);
+    margin: 12px 0 0 0;
 }
 
 /* Scrollbar */
@@ -326,44 +525,71 @@ body {
 /* ===== RULES ===== */
 .rules {
     background: white;
-    padding: 20px;
+    padding: 25px;
     border-radius: 20px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     transition: all 0.3s ease;
 }
 
 .rules:hover {
-    transform: translateY(-3px) scale(1.01);
-    box-shadow: 0 18px 35px rgba(0,0,0,0.15);
+    transform: translateY(-3px);
+    box-shadow: 0 25px 70px rgba(0,0,0,0.35);
 }
 
 .rules h3 {
-    border-left: 5px solid #007bff;
-    padding-left: 10px;
-    margin: 0 0 6px 0;
+    border-left: 5px solid #667eea;
+    padding-left: 12px;
+    margin: 0 0 15px 0;
+    color: #1a1a2e;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.rules-header {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.rules-header p {
+    margin: 3px 0;
+    font-size: 13px;
+    color: #555;
+}
+
+.rules-header strong {
+    color: #667eea;
 }
 
 .rules ol {
-    padding-left: 18px;
+    padding-left: 20px;
     margin: 0;
 }
 
 .rules ol li {
-    margin-bottom: 5px;
-    font-size: 14px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: #444;
     transition: 0.2s;
+    line-height: 1.5;
 }
 
 .rules ol li:hover {
-    transform: translateX(4px);
-    color: #007bff;
+    transform: translateX(5px);
+    color: #667eea;
 }
 
 /* ===== ERROR ===== */
 .error {
-    color: red;
-    margin-top: 6px;
+    background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 10px;
+    margin-top: 10px;
+    font-size: 13px;
     animation: shake 0.25s;
+    box-shadow: 0 4px 15px rgba(235, 51, 73, 0.3);
 }
 
 @keyframes shake {
@@ -423,24 +649,65 @@ body {
 
 <!-- NAVBAR -->
 <div class="navbar">
-    <div class="left">Dashboard</div>
+    <div class="left">
+        <img src="uclogo.png" alt="UC Logo" class="uc-logo">
+        <span>CCS Sit-in System</span>
+    </div>
     <div class="right">
         <!-- Notification Dropdown -->
         <div class="dropdown">
-            <button class="dropdown-btn">Notifications &#9662;</button>
+            <button class="dropdown-btn">
+                Notifications 
+                <?php 
+                $unreadCount = 0;
+                foreach($notifications_data as $n){
+                    if(!$n['is_read']) $unreadCount++;
+                }
+                if($unreadCount > 0) echo '<span class="notif-badge">' . $unreadCount . '</span>';
+                ?>
+            </button>
             <div class="dropdown-content">
-                <p>No new notifications</p>
+                <?php 
+                if(count($notifications_data) > 0): 
+                    foreach($notifications_data as $notif): 
+                        $targetPage = ($notif['type'] === 'success') ? 'history.php' : 'reservation.php';
+                ?>
+                    <p class="notif-item <?php echo htmlspecialchars($notif['type']); ?>" onclick="markRead('<?php echo $user['id_number']; ?>', '<?php echo $targetPage; ?>')" style="cursor:pointer;">
+                        <span class="notif-icon"><?php echo $notif['type'] === 'success' ? '✓' : ($notif['type'] === 'error' ? '✗' : 'ℹ'); ?></span>
+                        <?php echo htmlspecialchars($notif['message']); ?>
+                        <small class="notif-time"><?php echo date("M d, h:i A", strtotime($notif['created_at'])); ?></small>
+                    </p>
+                <?php 
+                    endforeach; 
+                else: 
+                ?>
+                    <p>No new notifications</p>
+                <?php endif; ?>
             </div>
         </div>
-        <a href="dashboard.php" class="home-link">Home</a>  <!-- Updated Home link -->
+        <a href="dashboard.php" class="active">Home</a>
         <a href="edit_profile.php">Edit Profile</a>
-        <a href="history.php">History Reservation</a>
+        <a href="history.php">History</a>
+        <a href="reservation.php">Reservation</a>
         <a href="logout.php">Logout</a>
     </div>
 </div>
 
+<script>
+function markRead(idNumber, redirect) {
+    fetch('mark_notif_read.php?id_number=' + idNumber)
+        .then(() => { window.location.href = redirect; });
+}
+</script>
+
 <!-- MAIN CONTENT -->
 <div class="content">
+    <!-- Welcome Banner -->
+    <div class="welcome-banner">
+        <h1>Welcome, <?php echo htmlspecialchars($user['first_name']); ?>!</h1>
+        <p>Manage your profile, view announcements, and make reservations</p>
+    </div>
+
     <!-- LEFT: Profile Card -->
     <div class="profile-card">
         <img src="<?php echo !empty($user['photo']) ? $user['photo'] : 'default_avatar.png'; ?>" alt="Profile Photo">
@@ -470,46 +737,48 @@ body {
             <h3>Announcements</h3>
             <?php if($announcement_result && $announcement_result->num_rows > 0): ?>
                 <?php while($row = $announcement_result->fetch_assoc()): ?>
-                    <p><strong>CCS Admin | <?php echo date("Y-M-d", strtotime($row['created_at'])); ?></strong></p>
-                    <p><?php echo nl2br(htmlspecialchars($row['message'])); ?></p>
-                    <hr>
+                    <div class="announcement-item">
+                        <p><strong>CCS Admin | <?php echo date("Y-M-d", strtotime($row['created_at'])); ?></strong></p>
+                        <p><?php echo nl2br(htmlspecialchars($row['message'])); ?></p>
+                    </div>
                 <?php endwhile; ?>
             <?php else: ?>
-                <p>No announcements yet.</p>
+                <div class="announcement-item">
+                    <p>No announcements yet.</p>
+                </div>
             <?php endif; ?>
         </div>
 
         <!-- Rules & Regulations -->
         <div class="rules">
             <h3>Rules and Regulations</h3>
-            <p><strong>University of Cebu</strong><br>College of Information & Computer Studies</p>
-            <p><strong>Laboratory Rules and Regulations</strong></p>
+            <div class="rules-header">
+                <p><strong>University of Cebu</strong></p>
+                <p>College of Information & Computer Studies</p>
+            </div>
             <ol>
                 <li>Maintain silence, proper decorum, and discipline inside the laboratory. Mobile phones, walkmans and other personal pieces of equipment must be switched off.</li>
                 <li>Games are not allowed inside the lab. This includes computer-related games, card games and other games that may disturb the operation of the lab.</li>
                 <li>Surfing the Internet is allowed only with the permission of the instructor. Downloading and installing of software are strictly prohibited.</li>
                 <li>Getting access to other websites not related to the course (especially pornographic and illicit sites) is strictly prohibited.</li>
                 <li>Deleting computer files and changing the set-up of the computer is a major offense.</li>
-                <li>Observe computer time usage carefully. A fifteen-minute allowance is given for each use. Otherwise, the unit will be given to those who wish to “sit-in”.</li>
-                <li>Observe proper decorum while inside the laboratory.
-            a. Do not get inside the lab unless the instructor is present.
-            b. All bags, knapsacks, and the likes must be deposited at the counter.
-            c. Follow the seating arrangement of your instructor.
-            d. At the end of class, all software programs must be closed.
-            e. Return all chairs to their proper places after using.
-            </li>
+                <li>Observe computer time usage carefully. A fifteen-minute allowance is given for each use. Otherwise, the unit will be given to those who wish to "sit-in".</li>
+                <li>Observe proper decorum while inside the laboratory.<br>
+                a. Do not get inside the lab unless the instructor is present.<br>
+                b. All bags, knapsacks, and the likes must be deposited at the counter.<br>
+                c. Follow the seating arrangement of your instructor.<br>
+                d. At the end of class, all software programs must be closed.<br>
+                e. Return all chairs to their proper places after using.</li>
                 <li>Chewing gum, eating, drinking, smoking, and other forms of vandalism are prohibited inside the lab.</li>
                 <li>Anyone causing a continual disturbance will be asked to leave the lab. Acts or gestures offensive to the members of the community, including public display of physical intimacy, are not tolerated.</li>
                 <li>Persons exhibiting hostile or threatening behavior such as yelling, swearing, or disregarding requests made by lab personnel will be asked to leave the lab.</li>
                 <li>For serious offense, the lab personnel may call the Civil Security Office (CSU) for assistance.</li>
                 <li>Any technical problem or difficulty must be addressed to the laboratory supervisor, student assistant or instructor immediately.</li>
-
             </ol>
         </div>
     </div>
-</div>
 
-<?php if(isset($_SESSION['last_logout_time'])): ?>
+    <?php if(isset($_SESSION['last_logout_time'])): ?>
 <div style="padding:10px; background:#d4edda; color:#155724; margin:10px auto; max-width:600px; border-radius:5px; text-align:center;">
     Admin last logged out at: <strong><?= $_SESSION['last_logout_time']; ?></strong>
 </div>

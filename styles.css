@@ -30,27 +30,7 @@ body{
   border-radius: 50%;
 }
 
-/* Watermark for index.html */
-body::before {
-  content: "";
-  position: fixed; /* stays in place while scrolling */
-  top: 50%;
-  left: 50%;
-  width: 400px; /* adjust size */
-  height: 400px; /* adjust size */
-  background: url('ucmainccslogo.png') no-repeat center center;
-  background-size: contain;
-  opacity: 0.1; /* faint watermark */
-  transform: translate(-50%, -50%);
-  pointer-events: none; /* allows clicking on content */
-  z-index: 0;
-}
 
-/* Ensure main content stays above watermark */
-.topnav, .content, .footer {
-  position: relative;
-  z-index: 1;
-}
 
 /* NAVIGATION LINKS */
 .topnavInside ul{

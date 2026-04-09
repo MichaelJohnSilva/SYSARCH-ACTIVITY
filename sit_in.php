@@ -58,13 +58,16 @@ if(isset($_POST['sit_in_submit'])){
     $id_number = trim($_POST['id_number']);
     $purpose = trim($_POST['purpose']);
     $lab = trim($_POST['lab']);
+    $computer = trim($_POST['computer']);
     
     if (!preg_match('/^[a-zA-Z0-9]+$/', $id_number)) {
         $error = "Invalid ID number.";
     } elseif (!preg_match('/^[a-zA-Z0-9 .#]+$/', $purpose)) {
         $error = "Invalid purpose.";
-    } elseif (!preg_match('/^[a-zA-Z0-9]+$/', $lab)) {
+    } elseif (!preg_match('/^[0-9]+$/', $lab)) {
         $error = "Invalid lab.";
+    } elseif (!preg_match('/^[0-9]+$/', $computer)) {
+        $error = "Invalid computer.";
     }
     
     if (!isset($error)) {
@@ -82,10 +85,10 @@ if(isset($_POST['sit_in_submit'])){
     
     if (!isset($error)) {
         $stmt = $conn->prepare("
-            INSERT INTO sitin_records (id_number, purpose, lab, status, time_in)
-            VALUES (?, ?, ?, 'Active', NOW())
+            INSERT INTO sitin_records (id_number, purpose, lab, computer_number, status, time_in)
+            VALUES (?, ?, ?, ?, 'Active', NOW())
         ");
-        $stmt->bind_param("sss", $id_number, $purpose, $lab);
+        $stmt->bind_param("ssss", $id_number, $purpose, $lab, $computer);
         $stmt->execute();
         
         $success = "Sit-in recorded successfully!";
@@ -565,8 +568,8 @@ $records = $conn->query("
                 <li><a href="sit_in.php" class="active">Sit-in</a></li>
                 <li><a href="view_sitin_records.php">View Records</a></li>
                 <li><a href="#">Sit-in Reports</a></li>
-                <li><a href="#">Feedback Reports</a></li>
-                <li><a href="#">Reservation</a></li>
+                <li><a href="feedback_reports.php">Feedback Reports</a></li>
+                <li><a href="admin_reservations.php">Reservation</a></li>
                 <li><a href="logout.php">Logout</a></li>
             </ul>
         </div>
@@ -740,8 +743,23 @@ $records = $conn->query("
                         <option value="ASP.Net">ASP.Net</option>
                     </select>
 
-                      <label>Lab</label>
-                        <input type="text" name="lab" placeholder="Enter Lab" required>
+                      <label>Lab *</label>
+                        <select name="lab" id="form_lab" required onchange="updateComputerOptions()">
+                            <option value="">Select Lab</option>
+                            <option value="517">Lab 517</option>
+                            <option value="518">Lab 518</option>
+                            <option value="519">Lab 519</option>
+                            <option value="520">Lab 520</option>
+                            <option value="521">Lab 521</option>
+                            <option value="524">Lab 524</option>
+                            <option value="526">Lab 526</option>
+                        </select>
+                        
+                        <label>Computer</label>
+                        <select name="computer" id="form_computer" required>
+                            <option value="">Select Computer</option>
+                        </select>
+                        
                         <label>Sessions Left</label>
                         <input type="text" id="form_sessions" readonly>
 
@@ -765,8 +783,29 @@ function openSitInForm(id, name, sessions) {
     document.getElementById("form_id_display").value = id;
     document.getElementById("form_name").value = name;
     document.getElementById("form_sessions").value = sessions;
+    document.getElementById("form_lab").value = "";
+    document.getElementById("form_computer").innerHTML = '<option value="">Select Computer</option>';
 
     document.getElementById("sitInModal").classList.add("show");
+}
+
+function updateComputerOptions() {
+    const lab = document.getElementById("form_lab").value;
+    const computerSelect = document.getElementById("form_computer");
+    
+    if (!lab) {
+        computerSelect.innerHTML = '<option value="">Select Computer</option>';
+        return;
+    }
+    
+    // In a real scenario, you'd fetch occupied computers via AJAX
+    // For now, show all 20 as available
+    let html = '<option value="">Select Computer</option>';
+    for (let i = 1; i <= 20; i++) {
+        const pcNum = String(i).padStart(2, '0');
+        html += '<option value="' + pcNum + '">' + pcNum + '</option>';
+    }
+    computerSelect.innerHTML = html;
 }
 
 function closeSitIn() {
@@ -781,6 +820,65 @@ window.onclick = function(event) {
     if (event.target === searchModal) closeSearch();
     if (event.target === sitInModal) closeSitIn();
 };
+
+// Lab status data - fetched from PHP
+const labStatusData = <?php
+$labs = ['517', '518', '519', '520', '521', '524', '526'];
+$labStatusSimple = [];
+foreach ($labs as $lab) {
+    // Get computers with computer_number
+    $q = $conn->prepare("SELECT computer_number FROM sitin_records WHERE lab = ? AND status = 'Active'");
+    $q->bind_param("s", $lab);
+    $q->execute();
+    $r = $q->get_result();
+    $occupied = [];
+    while ($row = $r->fetch_assoc()) {
+        if (!empty($row['computer_number'])) $occupied[] = $row['computer_number'];
+    }
+    $q->close();
+    
+    // Get total active sit-ins
+    $cntQ = $conn->prepare("SELECT COUNT(*) as cnt FROM sitin_records WHERE lab = ? AND status = 'Active'");
+    $cntQ->bind_param("s", $lab);
+    $cntQ->execute();
+    $cntResult = $cntQ->get_result()->fetch_assoc();
+    $totalOccupied = $cntResult['cnt'] ?? 0;
+    $cntQ->close();
+    
+    // Add fallback for old records without computer_number
+    $identified = count($occupied);
+    $unidentified = $totalOccupied - $identified;
+    for ($i = 1; $i <= $unidentified; $i++) {
+        $pcNum = str_pad($i, 2, '0', STR_PAD_LEFT);
+        if (!in_array($pcNum, $occupied)) {
+            $occupied[] = $pcNum;
+        }
+    }
+    
+    $labStatusSimple[] = ['lab' => $lab, 'occupied_computers' => $occupied];
+}
+echo json_encode($labStatusSimple);
+?>;
+
+function updateComputerOptions() {
+    const lab = document.getElementById("form_lab").value;
+    const computerSelect = document.getElementById("form_computer");
+    
+    if (!lab) {
+        computerSelect.innerHTML = '<option value="">Select Computer</option>';
+        return;
+    }
+    
+    const labInfo = labStatusData.find(l => l.lab === lab);
+    let html = '<option value="">Select Computer</option>';
+    for (let i = 1; i <= 20; i++) {
+        const pcNum = String(i).padStart(2, '0');
+        if (!labInfo.occupied_computers.includes(pcNum)) {
+            html += '<option value="' + pcNum + '">' + pcNum + '</option>';
+        }
+    }
+    computerSelect.innerHTML = html;
+}
 </script>
 
 <?php if(isset($_POST['search_student'])): ?>

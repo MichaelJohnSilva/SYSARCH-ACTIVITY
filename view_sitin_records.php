@@ -158,9 +158,12 @@ if(isset($_GET['ajax'])){
 }
 
 
-if(isset($_POST['search']) && !empty($_POST['keyword'])){
+$isSearch = false;
 
-    $keyword = "%" . trim($_POST['keyword']) . "%";
+if(isset($_GET['q']) && trim($_GET['q']) != ''){
+    $isSearch = true;
+
+    $keyword = "%" . trim($_GET['q']) . "%";
 
     $stmt = $conn->prepare("
         SELECT s.id, s.id_number, 
@@ -168,18 +171,14 @@ if(isset($_POST['search']) && !empty($_POST['keyword'])){
             s.purpose, s.lab, s.time_in, s.time_out
         FROM sitin_records s
         LEFT JOIN students st ON s.id_number = st.id_number
-        WHERE 
-            s.id_number LIKE ? OR
-            LOWER(CONCAT(st.first_name, ' ', st.middle_name, ' ', st.last_name)) LIKE LOWER(?)
+        WHERE s.id_number LIKE ?
         ORDER BY s.time_in DESC
     ");
-
-    $stmt->bind_param("ss", $keyword, $keyword);
+    $stmt->bind_param("s", $keyword);
     $stmt->execute();
     $tableResult = $stmt->get_result();
 
 } else {
-
     $tableResult = $conn->query("
         SELECT s.id, s.id_number, 
             st.first_name, st.middle_name, st.last_name,
@@ -189,6 +188,7 @@ if(isset($_POST['search']) && !empty($_POST['keyword'])){
         ORDER BY s.time_in DESC
     ");
 }
+
 ?>
 
     <!DOCTYPE html>
@@ -384,135 +384,178 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
     display: inline-block;
 }
 
-/* MODAL */
+/* ========================= */
+/* MODAL OVERLAY (BLUR BG)   */
+/* ========================= */
 .modal {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(5px);
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
     justify-content: center;
     align-items: center;
     z-index: 9999;
-    animation: fadeIn 0.3s ease;
 }
 
 .modal.show { display: flex; }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
+/* ========================= */
+/* MODAL CARD                */
+/* ========================= */
 .modal-content {
-    background: white;
+    background: #f4f4f6;
     width: 90%;
-    max-width: 800px;
-    border-radius: 25px;
-    padding: 35px;
-    box-shadow: 0 25px 80px rgba(0,0,0,0.3);
-    animation: scaleIn 0.4s ease;
-    max-height: 85vh;
-    overflow-y: auto;
+    max-width: 700px;
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    animation: fadeIn 0.3s ease;
 }
 
-@keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.8); }
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.9); }
     to { opacity: 1; transform: scale(1); }
 }
 
+/* ========================= */
+/* HEADER                    */
+/* ========================= */
 .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 25px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid #f0f0f0;
 }
 
 .modal-header h2 {
     margin: 0;
-    color: #333;
-    font-size: 24px;
+    font-size: 18px;
+    font-weight: 600;
 }
 
 .close {
-    width: 40px;
-    height: 40px;
+    width: 35px;
+    height: 35px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    color: #666;
-    transition: all 0.3s ease;
+    background: #ddd;
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    transition: 0.3s;
+    border: none;
+    font-size: 20px;
+    color: #333;
 }
 
 .close:hover {
-    background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
-    color: white;
-    transform: rotate(90deg);
+    background: #bbb;
 }
 
-/* FORMS */
+/* ========================= */
+/* SEARCH BAR                */
+/* ========================= */
 .search-form {
     display: flex;
-    gap: 15px;
-    margin-bottom: 25px;
+    gap: 10px;
+    margin: 15px 0;
 }
 
 .search-form input {
     flex: 1;
-    padding: 15px 20px;
-    border: 2px solid #e0e0e0;
-    border-radius: 15px;
-    font-size: 15px;
-    transition: all 0.3s ease;
+    padding: 12px 15px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    outline: none;
+    font-size: 14px;
+    transition: 0.3s;
 }
 
 .search-form input:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-    outline: none;
+    border-color: #7b6cf6;
 }
 
+/* ========================= */
+/* BUTTON (PURPLE GRADIENT)  */
+/* ========================= */
 .btn-search {
-    padding: 15px 30px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
     border: none;
-    border-radius: 15px;
+    padding: 10px 18px;
+    border-radius: 12px;
     cursor: pointer;
     font-weight: 600;
-    font-size: 15px;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    font-size: 14px;
+    transition: 0.3s;
 }
 
 .btn-search:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102,126,234,0.4);
 }
 
-.btn-logout {
-    padding: 10px 20px;
-    background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
-    color: white;
-    border: none;
-    border-radius: 25px;
-    cursor: pointer;
-    font-weight: 600;
+/* ========================= */
+/* NO RECORDS                */
+/* ========================= */
+.no-records {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+    font-size: 15px;
+}
+
+/* ========================= */
+/* SIT-IN FORM CARD          */
+/* ========================= */
+.sit-in-form {
+    margin-top: 15px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.sit-in-form label {
     font-size: 13px;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(235, 51, 73, 0.3);
+    font-weight: 500;
 }
 
-.btn-logout:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(235, 51, 73, 0.4);
+.sit-in-form input,
+.sit-in-form select {
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    width: 100%;
+    font-size: 14px;
+    transition: 0.3s;
+}
+
+.sit-in-form input:focus,
+.sit-in-form select:focus {
+    border-color: #7b6cf6;
+    outline: none;
+}
+
+.sit-in-form input[readonly] {
+    background: #eee;
+}
+
+.sit-in-form .btn-submit {
+    grid-column: span 2;
+    margin-top: 10px;
+    padding: 12px;
+    background: #1cc88a;
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.sit-in-form .btn-submit:hover {
+    background: #17a673;
 }
 
 /* SIT IN BUTTON */
@@ -552,6 +595,15 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
         font-size: 11px;
         padding: 10px 5px;
     }
+    .search-form {
+        flex-direction: column;
+    }
+    .sit-in-form {
+        grid-template-columns: 1fr;
+    }
+    .sit-in-form .btn-submit {
+        grid-column: span 1;
+    }
 }
 </style>
     </head>
@@ -567,13 +619,13 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
         <div class="topnavInside">
             <ul>
                 <li><a href="admin_dashboard.php">Home</a></li>
-                <li><a href="#" onclick="openSearch()">Search</a></li>
+                <li><a href="#" onclick="openSearch()">Search Student</a></li>
                 <li><a href="students.php">Students</a></li>
                 <li><a href="sit_in.php">Sit-in</a></li>
                 <li><a class="active" href="view_sitin_records.php">View Sit-in Records</a></li>
                 <li><a href="#">Sit-in Reports</a></li>
-                <li><a href="#">Feedback Reports</a></li>
-                <li><a href="#">Reservation</a></li>
+                <li><a href="feedback_reports.php">Feedback Reports</a></li>
+                <li><a href="admin_reservations.php">Reservation</a></li>
                 <li><a href="logout.php">Logout</a></li>
             </ul>
         </div>
@@ -582,7 +634,9 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
     <!-- CHARTS SECTION -->
     <div class="container">
         <h2>Current Sit-in Records</h2>
-        <div style="display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px;">
+        
+        <!-- ROW 1: Two Pie Charts -->
+        <div style="display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px;">
             <!-- Programming Language Pie Chart -->
             <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); width: 450px;">
                 <h3 style="text-align: center; color: #333; margin-bottom: 20px; font-size: 18px;">Programming Languages Used</h3>
@@ -594,21 +648,20 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
                 <canvas id="labChart"></canvas>
             </div>
         </div>
-    </div>
+        
+        <!-- ROW 2: Search Bar (Right Side) -->
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 30px;">
+            <form method="GET" style="display: flex; gap: 10px; align-items: center; width: 450px;">
+                <input type="text" name="q" placeholder="Search by ID Number..." 
+                    value="<?php echo isset($_GET['q']) ? htmlspecialchars($_GET['q']) : ''; ?>"
+                    style="flex: 1; padding: 14px 18px; border-radius: 30px; border: none; outline: none; font-size: 14px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                <button type="submit" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 14px 25px; border-radius: 30px; cursor: pointer; font-weight: 600; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); transition: 0.3s;">Search</button>
+                <?php if(isset($_GET['q']) && $_GET['q'] != ''): ?>
+                    <a href="view_sitin_records.php" style="background: #6c757d; color: white; text-decoration: none; padding: 14px 20px; border-radius: 30px; font-weight: 600; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">Clear</a>
+                <?php endif; ?>
+            </form>
+        </div>
 
-    <div class="container" style="margin-top: -10px;">
-
-        <form method="POST" style="display:flex; justify-content:center; gap:10px; margin-bottom:20px;">
-            
-            <input type="text" name="keyword" placeholder="Enter ID Number..."
-                value="<?php echo isset($_POST['keyword']) ? htmlspecialchars($_POST['keyword']) : ''; ?>"
-                style="width:300px; padding:12px; border-radius:10px; border:1px solid #ccc;">
-
-            <button type="submit" name="search" class="btn-search">
-                Search
-            </button>
-
-        </form>
 
     </div>
 
@@ -627,35 +680,47 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
                 <th>Date</th>
             </tr>
             </thead>
-            <tbody id="sitInTableBody">     
+            <tbody id="sitInTableBody">
             <?php
             if ($tableResult && $tableResult->num_rows > 0) {
                 while($row = $tableResult->fetch_assoc()) {
             ?>
             <tr>
-                <td><?php echo $row['id']; ?></td>
+                <td><?php echo $row['id'] ?? '-'; ?></td>
                 <td><?php echo htmlspecialchars($row['id_number']); ?></td>
                 <td>
                     <?php echo htmlspecialchars(
-                        $row['first_name'].' '.$row['middle_name'].' '.$row['last_name']
+                        ($row['first_name'] ?? '') . ' ' . 
+                        ($row['middle_name'] ?? '') . ' ' . 
+                        ($row['last_name'] ?? '')
                     ); ?>
                 </td>
-                <td><?php echo htmlspecialchars($row['purpose']); ?></td>
-                <td><?php echo htmlspecialchars($row['lab']); ?></td>
-                <td><?php echo date("h:i A", strtotime($row['time_in'])); ?></td>
+                <td><?php echo $row['purpose'] ?? '-'; ?></td>
+                <td><?php echo $row['lab'] ?? '-'; ?></td>
                 <td>
-                    <?php echo $row['time_out'] 
+                    <?php echo isset($row['time_in']) 
+                        ? date("h:i A", strtotime($row['time_in'])) 
+                        : '-'; ?>
+                </td>
+                <td>
+                    <?php echo (!empty($row['time_out']))
                         ? date("h:i A", strtotime($row['time_out'])) 
                         : '-'; ?>
                 </td>
-                <td><?php echo date("M d, Y", strtotime($row['time_in'])); ?></td>
+                <td>
+                    <?php echo isset($row['time_in']) 
+                        ? date("M d, Y", strtotime($row['time_in'])) 
+                        : '-'; ?>
+                </td>
             </tr>
             <?php
                 }
             } else {
             ?>
             <tr>
-                <td colspan="8">No records found.</td>
+                <td colspan="8" class="no-records">
+                    <?php echo $isSearch ? "No records found." : "No data available."; ?>
+                </td>
             </tr>
             <?php
             }
@@ -664,106 +729,104 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
         </table>
     </div>
 
-    <div id="searchModal" class="modal">
-  <div class="modal-content">
+<!-- SEARCH MODAL -->
+<div id="searchModal" class="modal">
+    <div class="modal-content">
 
-    <!-- HEADER -->
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h3 style="color: black;">Search Student</h3>
-      <span class="close" onclick="closeSearch()">×</span>
+        <!-- HEADER -->
+        <div class="modal-header">
+            <h3 style="color: black;">Search Student</h3>
+            <button class="close" onclick="closeSearch()">&times;</button>
+        </div>
+
+        <!-- SEARCH FORM -->
+        <form method="POST" class="search-form">
+            <input type="text" name="keyword" placeholder="Enter ID Number, Name, or Course..."
+                value="<?php echo isset($_POST['keyword']) ? htmlspecialchars($_POST['keyword']) : ''; ?>">
+            <button type="submit" name="search_modal" class="btn-search">Search</button>
+        </form>
+
+        <!-- SEARCH RESULTS -->
+        <?php if (isset($searchResults)): ?>
+
+            <?php if ($searchResults->num_rows > 0): ?>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID Number</th>
+                            <th>Name</th>
+                            <th>Course</th>
+                            <th>Sessions</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while ($row = $searchResults->fetch_assoc()): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($row['id_number']); ?></td>
+                                <td><?php echo htmlspecialchars(
+                                    $row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name']
+                                ); ?></td>
+                                <td><?php echo htmlspecialchars($row['course']); ?></td>
+                                <td><?php echo htmlspecialchars($row['sessions_remaining'] ?? 30); ?></td>
+                                <td>
+                                    <button type="button" class="btn-search"
+                                        onclick="openSitInDirect('<?php echo htmlspecialchars($row['id_number']); ?>', '<?php echo htmlspecialchars($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name']); ?>', '<?php echo htmlspecialchars($row['sessions_remaining'] ?? 30); ?>')">
+                                        Sit In
+                                    </button>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <p class="no-records">No students found.</p>
+            <?php endif; ?>
+
+        <?php endif; ?>
+
     </div>
-
-    <hr>
-
-    <!-- SEARCH BAR -->
-    <form method="POST" style="display:flex; gap:10px; margin:15px 0;">
-      <div style="display:flex; gap:10px; flex:1;">
-        <input type="text" name="keyword" placeholder="Search..."
-          value="<?php echo isset($_POST['keyword']) ? htmlspecialchars($_POST['keyword']) : ''; ?>"
-          style="flex:1; padding:12px; border:1px solid #ccc; border-radius:6px;">
-
-        <button type="submit" name="search_modal" class="search-btn">Search</button>
-      </div>
-    </form>
-
-    <hr>
-
-    <!-- RESULTS -->    
-    <?php if (isset($searchResults)): ?>
-      <h3>Search Results:</h3>
-
-      <?php if ($searchResults->num_rows > 0): ?>
-        <table>
-          <tbody>
-            <?php while ($row = $searchResults->fetch_assoc()): ?>
-              <tr>
-                <td><?php echo htmlspecialchars($row['id_number']); ?></td>
-                <td><?php echo htmlspecialchars($row['first_name']); ?></td>
-                <td><?php echo htmlspecialchars($row['middle_name']); ?></td>
-                <td><?php echo htmlspecialchars($row['last_name']); ?></td>
-                <td><?php echo htmlspecialchars($row['course']); ?></td>
-                <td><?php echo htmlspecialchars($row['sessions_remaining'] ?? 30); ?></td>
-
-                <td>
-                  <button type="button" style="padding: 8px 18px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.3s ease; box-shadow: 0 3px 10px rgba(56, 239, 125, 0.3);" onclick="openSitInDirect('<?php echo htmlspecialchars($row['id_number']); ?>', '<?php echo htmlspecialchars($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name']); ?>', '<?php echo htmlspecialchars($row['sessions_remaining'] ?? 30); ?>')">
-                    Sit In
-                  </button>
-                </td>
-              </tr>
-            <?php endwhile; ?>
-          </tbody>
-        </table>
-
-
-
-      <?php else: ?>
-        <p>No students found.</p>
-      <?php endif; ?>
-
-    <?php endif; ?>
-
-  </div>
 </div>
 
 
     <!-- SIT-IN MODAL -->
 <div id="sitInModal" class="modal">
-  <div class="modal-content">
+    <div class="modal-content">
 
-    <div class="modal-header">
-      <h2>Sit In Form</h2>
-      <span class="close" onclick="closeSitInForm()">×</span>
+        <div class="modal-header">
+            <h3 stlye="color: black">Sit-In Form</h3>
+            <button class="close" onclick="closeSitInForm()">&times;</button>
+        </div>
+
+        <form method="POST" class="sit-in-form">
+            <input type="hidden" name="id_number" id="form_id">
+
+            <label>ID Number</label>
+            <input type="text" id="form_id_display" readonly>
+
+            <label>Student Name</label>
+            <input type="text" id="form_name" readonly>
+
+            <label>Purpose *</label>
+            <select name="purpose" required>
+                <option value="">Select Purpose</option>
+                <option value="C">C</option>
+                <option value="C#">C#</option>
+                <option value="Java">Java</option>
+                <option value="PHP">PHP</option>
+                <option value="ASP.Net">ASP.Net</option>
+            </select>
+
+            <label>Lab</label>
+            <input type="text" name="lab" placeholder="Enter Lab" required>
+
+            <label>Sessions Left</label>
+            <input type="text" id="form_sessions" readonly>
+
+            <button type="submit" name="sit_in_submit" class="btn-submit">✓ Sit In</button>
+        </form>
+
     </div>
-
-    <form method="POST" action="sit_in.php" class="form-container">
-
-      <label>ID Number</label>
-      <input type="text" name="id_number" placeholder="Enter student ID" required>
-
-      <label>Student Name</label>
-      <input type="text" name="student_name">
-
-      <label>Purpose</label>
-      <select name="purpose" required>
-        <option value="">Select Language</option>
-        <option value="C">C</option>
-        <option value="C#">C#</option>
-        <option value="Java">Java</option>
-        <option value="PHP">PHP</option>
-        <option value="ASP.Net">ASP.Net</option>
-      </select>
-
-      <label>Lab</label>
-      <input type="text" name="lab" required>
-
-      <label>Remaining Session</label>
-      <input type="text" name="remaining_session">
-
-      <button type="submit" name="sit_in_submit" class="submit-btn">Sit In</button>
-
-    </form>
-
-  </div>
 </div>
     </body>
 <script>
@@ -783,11 +846,14 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
     }
 
     function openSitInDirect(id, name, session) {
+        // Close search modal first
+        closeSearch();
         // Set values in the form
-        document.querySelector('#sitInModal input[name="id_number"]').value = id;
-        document.querySelector('#sitInModal input[name="student_name"]').value = name;
-        document.querySelector('#sitInModal input[name="remaining_session"]').value = session;
-        // Open the modal
+        document.getElementById("form_id").value = id;
+        document.getElementById("form_id_display").value = id;
+        document.getElementById("form_name").value = name;
+        document.getElementById("form_sessions").value = session;
+        // Open the sit-in modal
         document.getElementById("sitInModal").classList.add("show");
     }
 
@@ -800,9 +866,10 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
         sitInSection.style.display = 'block';
         
         // Store the values for the sit-in form
-        document.querySelector('#sitInModal input[name="id_number"]').value = id;
-        document.querySelector('#sitInModal input[name="student_name"]').value = name;
-        document.querySelector('#sitInModal input[name="remaining_session"]').value = session;
+        document.getElementById("form_id").value = id;
+        document.getElementById("form_id_display").value = id;
+        document.getElementById("form_name").value = name;
+        document.getElementById("form_sessions").value = session;
     }
 
     window.onclick = function(event) {
@@ -830,7 +897,7 @@ function reloadSitInRecords() {
 // Refresh every 10 seconds
 // Smart refresh (only when no modal is open)
 
-let isSearching = <?php echo (isset($_POST['search']) ? 'true' : 'false'); ?>;
+let isSearching = <?php echo (isset($_GET['q']) && $_GET['q'] != '') ? 'true' : 'false'; ?>;
 
 setInterval(() => {
     if (!document.querySelector('.modal.show') && !isSearching) {
@@ -936,6 +1003,10 @@ new Chart(labCtx, {
     }
 });
 
+// Reopen search modal if search was submitted
+<?php if(isset($_POST['search_modal'])): ?>
+document.getElementById('searchModal').classList.add('show');
+<?php endif; ?>
 </script>
 
     </html> 

@@ -560,8 +560,8 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
         <li><a href="sit_in.php">Sit-in</a></li>
         <li><a class="<?php echo basename($_SERVER['PHP_SELF'])=='view_sitin_records.php'?'active':'' ?>" href="view_sitin_records.php">View Sit-in Records</a></li>
         <li><a href="#">Sit-in Reports</a></li>
-        <li><a href="#">Feedback Reports</a></li>
-        <li><a href="#">Reservation</a></li>
+        <li><a href="feedback_reports.php">Feedback Reports</a></li>
+        <li><a href="admin_reservations.php">Reservation</a></li>
         <li><a class="logout" href="logout.php">Log out</a></li>
     </ul>
   </div>
