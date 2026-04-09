@@ -1,6 +1,9 @@
    <?php
 session_start();
 include "config.php";
+   <?php
+session_start();
+include "config.php";
 
 /* TIMEOUT HANDLER */
 if(isset($_POST['timeout'])){
