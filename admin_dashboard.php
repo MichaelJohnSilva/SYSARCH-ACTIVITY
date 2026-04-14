@@ -12,6 +12,94 @@ $result = $conn->query("SELECT COUNT(*) as total FROM students WHERE role != 'ad
 $data = $result->fetch_assoc();
 $total_students = $data['total'];
 
+/* LEADERBOARD DATA */
+$leaderboardQuery = "
+    SELECT 
+        s.id_number,
+        st.first_name,
+        st.middle_name,
+        st.last_name,
+        st.course,
+        st.year_level,
+        COUNT(s.id) as total_sessions,
+        SUM(TIMESTAMPDIFF(HOUR, s.time_in, COALESCE(s.time_out, NOW()))) as total_hours,
+        s.lab as lab_visited
+    FROM sitin_records s
+    LEFT JOIN students st ON s.id_number = st.id_number
+    WHERE (s.status = 'Ended' OR s.time_out IS NOT NULL)
+    GROUP BY s.id_number, st.first_name, st.middle_name, st.last_name, st.course, st.year_level, s.lab
+    ORDER BY total_hours DESC
+";
+
+$leaderboardResult = $conn->query($leaderboardQuery);
+
+$userStats = [];
+if ($leaderboardResult && $leaderboardResult->num_rows > 0) {
+    while ($row = $leaderboardResult->fetch_assoc()) {
+        $id = $row['id_number'];
+        if (!isset($userStats[$id])) {
+            $userStats[$id] = [
+                'id_number' => $row['id_number'],
+                'name' => $row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name'],
+                'course' => $row['course'],
+                'year_level' => $row['year_level'],
+                'total_sessions' => 0,
+                'total_hours' => 0,
+                'labs' => []
+            ];
+        }
+        $userStats[$id]['total_sessions'] += $row['total_sessions'];
+        $userStats[$id]['total_hours'] += max(0, $row['total_hours']);
+        
+        if (!empty($row['lab_visited'])) {
+            if (!isset($userStats[$id]['labs'][$row['lab_visited']])) {
+                $userStats[$id]['labs'][$row['lab_visited']] = 0;
+            }
+            $userStats[$id]['labs'][$row['lab_visited']] += $row['total_sessions'];
+        }
+    }
+}
+
+foreach ($userStats as &$user) {
+    $user['points'] = floor($user['total_hours'] / 3);
+    if (!empty($user['labs'])) {
+        arsort($user['labs']);
+        $user['most_visited_lab'] = key($user['labs']);
+    } else {
+        $user['most_visited_lab'] = 'N/A';
+    }
+}
+unset($user);
+
+usort($userStats, function($a, $b) {
+    return $b['points'] - $a['points'];
+});
+
+
+
+/* OVERALL STATS */
+$totalStudentsQuery = "SELECT COUNT(DISTINCT id_number) as total FROM sitin_records WHERE status = 'Ended' OR time_out IS NOT NULL";
+$totalStudents = $conn->query($totalStudentsQuery)->fetch_assoc()['total'] ?? 0;
+
+$totalHoursQuery = "SELECT SUM(TIMESTAMPDIFF(HOUR, time_in, COALESCE(time_out, NOW()))) as total FROM sitin_records WHERE status = 'Ended' OR time_out IS NOT NULL";
+$totalHours = $conn->query($totalHoursQuery)->fetch_assoc()['total'] ?? 0;
+
+$totalSessionsQuery = "SELECT COUNT(*) as total FROM sitin_records WHERE status = 'Ended' OR time_out IS NOT NULL";
+$totalSessions = $conn->query($totalSessionsQuery)->fetch_assoc()['total'] ?? 0;
+
+$labStatsQuery = "SELECT lab, COUNT(*) as total_visits FROM sitin_records WHERE lab IS NOT NULL AND lab != '' GROUP BY lab ORDER BY total_visits DESC LIMIT 1";
+$mostVisitedLab = $conn->query($labStatsQuery)->fetch_assoc();
+
+/* LAB CHART DATA */
+$labChartQuery = "SELECT lab, COUNT(*) as count FROM sitin_records WHERE lab IS NOT NULL AND lab != '' GROUP BY lab ORDER BY count DESC";
+$labChartResult = $conn->query($labChartQuery);
+$labChartLabels = [];
+$labChartData = [];
+while($labRow = $labChartResult->fetch_assoc()) {
+    $labChartLabels[] = $labRow['lab'];
+    $labChartData[] = $labRow['count'];
+}
+
 
 /* POST ANNOUNCEMENT */
 if(isset($_POST['post_announcement'])){
@@ -82,6 +170,7 @@ while($row = $chart_query->fetch_assoc()){
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <style>
 /* ========================= */
@@ -228,22 +317,24 @@ body {
 /* DASHBOARD LAYOUT          */
 /* ========================= */
 .dashboard-container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 40px auto;
     display: flex;
-    gap: 20px;
+    flex-direction: column;
+    gap: 25px;
+    padding: 0 20px;
 }
 
 /* ========================= */
 /* CARDS                     */
 /* ========================= */
 .dashboard-card {
-    flex: 1;
     background: white;
     border-radius: 20px;
     padding: 25px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.1);
     transition: 0.3s;
+    width: 100%;
 }
 
 .dashboard-card:hover {
@@ -750,7 +841,20 @@ table tr:hover td {
       </select>
 
       <label>Lab</label>
-      <input type="text" name="lab" required>
+      <select name="lab" id="form_lab" required onchange="updateComputerOptions()">
+        <option value="">Select Lab</option>
+        <option value="524">Lab 524</option>
+        <option value="526">Lab 526</option>
+        <option value="528">Lab 528</option>
+        <option value="530">Lab 530</option>
+        <option value="542">Lab 542</option>
+        <option value="544">Lab 544</option>
+      </select>
+
+      <label>Computer</label>
+      <select name="computer" id="form_computer" required>
+        <option value="">Select Computer</option>
+      </select>
 
       <label>Remaining Session</label>
       <input type="text" name="remaining_session" readonly>
@@ -779,23 +883,129 @@ $current_count = $current->fetch_assoc()['total'];
 $total_count   = $total->fetch_assoc()['total'];
 ?>
 
-<div class="stats-grid">
+<div class="stats-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
     <div class="stat-card">
         <div class="stat-number"><?php echo $total_students; ?></div>
         <div class="stat-label">Students Registered</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-number"><?php echo $current_count; ?></div>
-        <div class="stat-label">Currently Sit-in</div>
+    <div class="stat-card" style="background: linear-gradient(135deg, #11998e, #38ef7d);">
+        <div class="stat-number"><?php echo number_format($totalHours); ?></div>
+        <div class="stat-label">Total Hours</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-number"><?php echo $total_count; ?></div>
-        <div class="stat-label">Total Sit-in</div>
+    <div class="stat-card" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+        <div class="stat-number"><?php echo $totalSessions; ?></div>
+        <div class="stat-label">Sessions Completed</div>
+    </div>
+    <div class="stat-card" style="background: linear-gradient(135deg, #4facfe, #00f2fe);">
+        <div class="stat-number" style="font-size: 28px;"><?php echo htmlspecialchars($mostVisitedLab['lab'] ?? 'N/A'); ?></div>
+        <div class="stat-label">Top Lab (<?php echo $mostVisitedLab['total_visits'] ?? 0; ?> vis)</div>
     </div>
 </div>
 
-<canvas id="chart"></canvas>
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 25px;">
+    <div style="background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
+        <div class="dashboard-title" style="margin-bottom: 15px; font-size: 14px;">Programming Language Usage</div>
+        <canvas id="chart"></canvas>
+    </div>
+    <div style="background: linear-gradient(135deg, #11998e, #38ef7d); border-radius: 20px; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.15);">
+        <div style="color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 500; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;">
+            <i class="fas fa-desktop"></i> Most Visited Lab
+        </div>
+        <div style="color: white; font-size: 36px; font-weight: 700;"><?php echo htmlspecialchars($mostVisitedLab['lab'] ?? 'N/A'); ?></div>
+        <div style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 8px;"><?php echo $mostVisitedLab['total_visits'] ?? 0; ?> total visits</div>
+    </div>
+</div>
 
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-top: 25px;">
+    <div style="background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
+        <div class="dashboard-title" style="margin-bottom: 20px;"><i class="fas fa-trophy"></i> Leaderboard - All Students</div>
+
+<form method="GET" style="display:flex; gap:10px; margin-bottom:15px;">
+    <input type="text" name="search_user" placeholder="Search student by name or ID..." value="<?php echo isset($_GET['search_user']) ? htmlspecialchars($_GET['search_user']) : ''; ?>" style="flex:1; padding:12px 15px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; outline:none; transition:0.3s;" onfocus="this.borderColor='#667eea';">
+    <button type="submit" style="padding:12px 20px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:10px; font-weight:600; cursor:pointer; transition:0.3s;"><i class="fas fa-search"></i> Search</button>
+    <?php if(isset($_GET['search_user'])): ?>
+    <a href="admin_dashboard.php" style="padding:12px 20px; background:#6c757d; color:#fff; border:none; border-radius:10px; font-weight:600; text-decoration:none; text-align:center;"><i class="fas fa-times"></i> Clear</a>
+    <?php endif; ?>
+</form>
+
+<?php
+$filteredStats = $userStats;
+if(isset($_GET['search_user']) && trim($_GET['search_user']) !== '') {
+    $search = strtolower(trim($_GET['search_user']));
+    $filteredStats = array_filter($userStats, function($user) use ($search) {
+        return strpos(strtolower($user['name']), $search) !== false || strpos(strtolower($user['id_number']), $search) !== false;
+    });
+    $filteredStats = array_values($filteredStats);
+}
+?>
+
+<div style="max-height: 500px; overflow-y: auto;">
+    <table style="width: 100%; border-collapse: collapse; margin-top: 0; border-radius: 15px; overflow: hidden;">
+        <thead style="background: linear-gradient(135deg, #667eea, #764ba2); position: sticky; top: 0; z-index: 10;">
+            <tr>
+                <th style="color: white; padding: 14px; font-size: 11px; text-transform: uppercase; width: 50px;">#</th>
+                <th style="color: white; padding: 14px; font-size: 11px; text-transform: uppercase;">Student</th>
+                <th style="color: white; padding: 14px; font-size: 11px; text-transform: uppercase;">Course</th>
+                <th style="color: white; padding: 14px; font-size: 11px; text-transform: uppercase;">Points (3hrs=1pt)</th>
+                <th style="color: white; padding: 14px; font-size: 11px; text-transform: uppercase;">Hours</th>
+                <th style="color: white; padding: 14px; font-size: 11px; text-transform: uppercase;">Tasks Done</th>
+                <th style="color: white; padding: 14px; font-size: 11px; text-transform: uppercase;">Favorite Lab</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (count($filteredStats) > 0): ?>
+                <?php foreach ($filteredStats as $index => $user): ?>
+                <tr style="background: <?php echo $index % 2 === 0 ? '#f9f9fb' : '#fff'; ?>; transition: 0.3s;">
+                    <td style="padding: 12px; text-align: center;">
+                        <?php 
+                        if ($index === 0) {
+                            echo '<span style="display:inline-block; width:28px; height:28px; line-height:28px; border-radius:50%; background:linear-gradient(135deg,#ffd700,#ffb700); color:#333; font-weight:bold; font-size:12px;">'.($index+1).'</span>';
+                        } elseif ($index === 1) {
+                            echo '<span style="display:inline-block; width:28px; height:28px; line-height:28px; border-radius:50%; background:linear-gradient(135deg,#c0c0c0,#a8a8a8); color:#333; font-weight:bold; font-size:12px;">'.($index+1).'</span>';
+                        } elseif ($index === 2) {
+                            echo '<span style="display:inline-block; width:28px; height:28px; line-height:28px; border-radius:50%; background:linear-gradient(135deg,#cd7f32,#b87333); color:#fff; font-weight:bold; font-size:12px;">'.($index+1).'</span>';
+                        } else {
+                            echo '<span style="display:inline-block; width:28px; height:28px; line-height:28px; border-radius:50%; background:#667eea; color:#fff; font-weight:600; font-size:12px;">'.($index+1).'</span>';
+                        }
+                        ?>
+                    </td>
+                    <td style="padding: 12px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#667eea,#764ba2); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:600; font-size:12px;"><?php echo strtoupper(substr($user['name'],0,1)); ?></div>
+                            <div style="font-weight:600; color:#333; font-size:13px;"><?php echo htmlspecialchars($user['name']); ?></div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; text-align: center; color:#666; font-size:13px;"><?php echo htmlspecialchars($user['course'] ?? 'N/A'); ?></td>
+                    <td style="padding: 12px; text-align: center;">
+                        <span style="background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:4px 12px; border-radius:15px; font-weight:700; font-size:13px;"><?php echo $user['points']; ?></span>
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <span style="font-weight:600; color:#333; font-size:14px;"><?php echo number_format($user['total_hours']); ?></span>
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <span style="font-weight:600; color:#333; font-size:14px;"><?php echo $user['total_sessions']; ?></span>
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <span style="background:linear-gradient(135deg,#11998e,#38ef7d); color:#fff; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:500;"><?php echo htmlspecialchars($user['most_visited_lab']); ?></span>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <tr>
+                    <td colspan="7" style="padding: 40px; text-align: center; color: #888;">
+                        <i class="fas fa-chart-line" style="font-size: 28px; margin-bottom: 10px; display: block; color: #ccc;"></i>
+                        No data available yet
+                    </td>
+                </tr>
+            <?php endif; ?>
+</tbody>
+    </table>
+</div>
+
+    <div style="background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
+        <div class="dashboard-title" style="margin-bottom: 20px;"><i class="fas fa-desktop"></i> Lab Statistics</div>
+        <canvas id="labChart" style="max-height: 350px;"></canvas>
+    </div>
 </div>
 
 <div class="dashboard-card">
@@ -892,11 +1102,14 @@ function deleteAnnouncement(id){
     }
 }
 
-/* CHART */
+/* CHARTS */
 const ctx = document.getElementById('chart');
+const labCtx = document.getElementById('labChart');
 
 const labels = <?php echo json_encode($chart_labels); ?>;
 const data = <?php echo json_encode($chart_data); ?>;
+const labLabels = <?php echo json_encode($labChartLabels); ?>;
+const labData = <?php echo json_encode($labChartData); ?>;
 
 new Chart(ctx,{
     type:'pie',
@@ -908,6 +1121,85 @@ new Chart(ctx,{
         }]
     }
 });
+
+new Chart(labCtx,{
+    type:'bar',
+    data:{
+        labels: labLabels,
+        datasets:[{
+            label: 'Visits',
+            data: labData,
+            backgroundColor:['#667eea','#764ba2','#11998e','#38ef7d','#f45c43']
+        }]
+    },
+    options:{responsive:true,plugins:{legend:{display:false}}}
+});
+
+// Lab status data
+const labStatusData = <?php
+$labs = ['524', '526', '528', '530', '542', '544'];
+$labStatusSimple = [];
+foreach ($labs as $lab) {
+    $q = $conn->prepare("SELECT computer_number FROM sitin_records WHERE lab = ? AND status = 'Active'");
+    $q->bind_param("s", $lab);
+    $q->execute();
+    $r = $q->get_result();
+    $occupied = [];
+    while ($row = $r->fetch_assoc()) {
+        if (!empty($row['computer_number'])) $occupied[] = $row['computer_number'];
+    }
+    $q->close();
+    
+    $cntQ = $conn->prepare("SELECT COUNT(*) as cnt FROM sitin_records WHERE lab = ? AND status = 'Active'");
+    $cntQ->bind_param("s", $lab);
+    $cntQ->execute();
+    $cntResult = $cntQ->get_result()->fetch_assoc();
+    $totalOccupied = $cntResult['cnt'] ?? 0;
+    $cntQ->close();
+    
+    $identified = count($occupied);
+    $unidentified = $totalOccupied - $identified;
+    for ($i = 1; $i <= $unidentified; $i++) {
+        $pcNum = str_pad($i, 2, '0', STR_PAD_LEFT);
+        if (!in_array($pcNum, $occupied)) {
+            $occupied[] = $pcNum;
+        }
+    }
+    
+    $labStatusSimple[] = ['lab' => $lab, 'occupied_computers' => $occupied];
+}
+echo json_encode($labStatusSimple);
+?>;
+
+function updateComputerOptions() {
+    const lab = document.getElementById("form_lab").value;
+    const computerSelect = document.getElementById("form_computer");
+    
+    if (!lab) {
+        computerSelect.innerHTML = '<option value="">Select Computer</option>';
+        return;
+    }
+    
+    const labData = labStatusData.find(l => l.lab === lab);
+    const occupiedComputers = labData ? labData.occupied_computers : [];
+    const occupiedCount = occupiedComputers.length;
+    const vacantCount = 20 - occupiedCount;
+    
+    let html = '<option value="">Select Computer (Vacant: ' + vacantCount + '/20)</option>';
+    
+    for (const pc of occupiedComputers) {
+        html += '<option value="' + pc + '" disabled style="background: #ffcccc;">' + pc + ' (Occupied)</option>';
+    }
+    
+    for (let i = 1; i <= 20; i++) {
+        const pcNum = String(i).padStart(2, '0');
+        if (!occupiedComputers.includes(pcNum)) {
+            html += '<option value="' + pcNum + '">' + pcNum + '</option>';
+        }
+    }
+    
+    computerSelect.innerHTML = html;
+}
 </script>
 </body>
 </html>

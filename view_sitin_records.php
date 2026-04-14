@@ -11,7 +11,7 @@ if(isset($_POST['timeout'])){
         SET time_out = NOW(),
             status = 'Ended'
         WHERE id = ?
-    ");a
+    ");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     
@@ -37,27 +37,29 @@ if(isset($_POST['timeout'])){
 if(isset($_POST['sit_in_submit'])){
     $id_number = trim($_POST['id_number']);
     $purpose = trim($_POST['purpose']);
-    $lab = trim($_POST['lab']);
+    $lab = isset($_POST['lab']) ? trim($_POST['lab']) : '';
+    $computer = isset($_POST['computer']) ? trim($_POST['computer']) : '';
     
-    // Check if student exists and has sessions
-    $checkStmt = $conn->prepare("SELECT sessions_remaining FROM students WHERE id_number = ?");
-    $checkStmt->bind_param("s", $id_number);
-    $checkStmt->execute();
-    $student = $checkStmt->get_result()->fetch_assoc();
-    
-    if($student && $student['sessions_remaining'] > 0){
-        // Insert sit-in record
-        $insertStmt = $conn->prepare("
-            INSERT INTO sitin_records (id_number, purpose, lab, status, time_in) 
-            VALUES (?, ?, ?, 'Active', NOW())
-        ");
-        $insertStmt->bind_param("sss", $id_number, $purpose, $lab);
-        $insertStmt->execute();
+    if (empty($lab)) {
+        $error = "Please select a lab.";
+    } elseif (empty($computer)) {
+        $error = "Please select a computer.";
+    } elseif (!empty($id_number) && !empty($purpose)) {
+        // Check if student exists and has sessions
+        $checkStmt = $conn->prepare("SELECT sessions_remaining FROM students WHERE id_number = ?");
+        $checkStmt->bind_param("s", $id_number);
+        $checkStmt->execute();
+        $student = $checkStmt->get_result()->fetch_assoc();
         
-        // Optionally decrement sessions
-        // $updateStmt = $conn->prepare("UPDATE students SET sessions_remaining = sessions_remaining - 1 WHERE id_number = ?");
-        // $updateStmt->bind_param("s", $id_number);
-        // $updateStmt->execute();
+        if($student && $student['sessions_remaining'] > 0){
+            // Insert sit-in record
+            $insertStmt = $conn->prepare("
+                INSERT INTO sitin_records (id_number, purpose, lab, computer_number, status, time_in) 
+                VALUES (?, ?, ?, ?, 'Active', NOW())
+            ");
+            $insertStmt->bind_param("ssss", $id_number, $purpose, $lab, $computer);
+            $insertStmt->execute();
+        }
     }
 }
 
@@ -817,8 +819,21 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
                 <option value="ASP.Net">ASP.Net</option>
             </select>
 
-            <label>Lab</label>
-            <input type="text" name="lab" placeholder="Enter Lab" required>
+            <label>Lab *</label>
+            <select name="lab" id="form_lab" required onchange="updateComputerOptions()">
+                <option value="">Select Lab</option>
+                <option value="524">Lab 524</option>
+                <option value="526">Lab 526</option>
+                <option value="528">Lab 528</option>
+                <option value="530">Lab 530</option>
+                <option value="542">Lab 542</option>
+                <option value="544">Lab 544</option>
+            </select>
+
+            <label>Computer *</label>
+            <select name="computer" id="form_computer" required>
+                <option value="">Select Computer</option>
+            </select>
 
             <label>Sessions Left</label>
             <input type="text" id="form_sessions" readonly>
@@ -1007,6 +1022,94 @@ new Chart(labCtx, {
 <?php if(isset($_POST['search_modal'])): ?>
 document.getElementById('searchModal').classList.add('show');
 <?php endif; ?>
+
+// Lab status data
+const labStatusData = <?php
+$labs = ['524', '526', '528', '530', '542', '544'];
+$labStatusSimple = [];
+foreach ($labs as $lab) {
+    $q = $conn->prepare("SELECT computer_number FROM sitin_records WHERE lab = ? AND status = 'Active'");
+    $q->bind_param("s", $lab);
+    $q->execute();
+    $r = $q->get_result();
+    $occupied = [];
+    while ($row = $r->fetch_assoc()) {
+        if (!empty($row['computer_number'])) $occupied[] = $row['computer_number'];
+    }
+    $q->close();
+    
+    $cntQ = $conn->prepare("SELECT COUNT(*) as cnt FROM sitin_records WHERE lab = ? AND status = 'Active'");
+    $cntQ->bind_param("s", $lab);
+    $cntQ->execute();
+    $cntResult = $cntQ->get_result()->fetch_assoc();
+    $totalOccupied = $cntResult['cnt'] ?? 0;
+    $cntQ->close();
+    
+    $identified = count($occupied);
+    $unidentified = $totalOccupied - $identified;
+    for ($i = 1; $i <= $unidentified; $i++) {
+        $pcNum = str_pad($i, 2, '0', STR_PAD_LEFT);
+        if (!in_array($pcNum, $occupied)) {
+            $occupied[] = $pcNum;
+        }
+    }
+    
+    $labStatusSimple[] = ['lab' => $lab, 'occupied_computers' => $occupied];
+}
+echo json_encode($labStatusSimple);
+?>;
+
+function updateComputerOptions() {
+    const labSelect = document.querySelector('select[name="lab"]');
+    const lab = labSelect ? labSelect.value : '';
+    const computerSelect = document.getElementById('form_computer');
+    
+    if (!computerSelect) {
+        // Create computer select if it doesn't exist
+        const form = document.querySelector('.sit-in-form');
+        const labSelectElement = form.querySelector('select[name="lab"]');
+        const sessionsInput = form.querySelector('#form_sessions');
+        
+        const computerLabel = document.createElement('label');
+        computerLabel.textContent = 'Computer';
+        const computerSelectNew = document.createElement('select');
+        computerSelectNew.name = 'computer';
+        computerSelectNew.id = 'form_computer';
+        computerSelectNew.required = true;
+        
+        form.insertBefore(computerLabel, sessionsInput);
+        form.insertBefore(computerSelectNew, sessionsInput);
+    }
+    
+    const compSelect = document.getElementById('form_computer');
+    if (!lab) {
+        compSelect.innerHTML = '<option value="">Select Computer</option>';
+        return;
+    }
+    
+    const labData = labStatusData.find(l => l.lab === lab);
+    const occupiedComputers = labData ? labData.occupied_computers : [];
+    const occupiedCount = occupiedComputers.length;
+    const vacantCount = 20 - occupiedCount;
+    
+    let html = '<option value="">Select Computer (Vacant: ' + vacantCount + '/20)</option>';
+    
+    for (const pc of occupiedComputers) {
+        html += '<option value="' + pc + '" disabled style="background: #ffcccc;">' + pc + ' (Occupied)</option>';
+    }
+    
+    for (let i = 1; i <= 20; i++) {
+        const pcNum = String(i).padStart(2, '0');
+        if (!occupiedComputers.includes(pcNum)) {
+            html += '<option value="' + pcNum + '">' + pcNum + '</option>';
+        }
+    }
+    
+    compSelect.innerHTML = html;
+}
+
+// Add onchange to lab select
+document.querySelector('.sit-in-form select[name="lab"]').addEventListener('change', updateComputerOptions);
 </script>
 
     </html> 

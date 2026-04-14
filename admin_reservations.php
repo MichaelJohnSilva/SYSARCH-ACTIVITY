@@ -98,7 +98,7 @@ $resStmt->execute();
 $reservations = $resStmt->get_result();
 
 // Lab room status - 20 computers each
-$labs = ['517', '518', '519', '520', '521', '524', '526'];
+$labs = ['524', '526', '528', '530', '542', '544'];
 $labStatus = [];
 
 foreach ($labs as $lab) {
@@ -185,21 +185,27 @@ if(isset($_POST['search'])){
 if(isset($_POST['sit_in_submit'])){
     $id_number = trim($_POST['id_number']);
     $purpose = trim($_POST['purpose']);
-    $lab = trim($_POST['lab']);
-    $computer = trim($_POST['computer']);
+    $lab = isset($_POST['lab']) ? trim($_POST['lab']) : '';
+    $computer = isset($_POST['computer']) ? trim($_POST['computer']) : '';
+    
+    if (empty($lab)) {
+        $error = "Please select a lab.";
+    } elseif (empty($computer)) {
+        $error = "Please select a computer.";
+    } elseif (!empty($id_number) && !empty($purpose)) {
+        $checkStmt = $conn->prepare("SELECT sessions_remaining FROM students WHERE id_number = ?");
+        $checkStmt->bind_param("s", $id_number);
+        $checkStmt->execute();
+        $student = $checkStmt->get_result()->fetch_assoc();
 
-    $checkStmt = $conn->prepare("SELECT sessions_remaining FROM students WHERE id_number = ?");
-    $checkStmt->bind_param("s", $id_number);
-    $checkStmt->execute();
-    $student = $checkStmt->get_result()->fetch_assoc();
-
-    if($student && $student['sessions_remaining'] > 0){
-        $insertStmt = $conn->prepare("
-            INSERT INTO sitin_records (id_number, purpose, lab, computer_number, status, time_in)
-            VALUES (?, ?, ?, ?, 'Active', NOW())
-        ");
-        $insertStmt->bind_param("ssss", $id_number, $purpose, $lab, $computer);
-        $insertStmt->execute();
+        if($student && $student['sessions_remaining'] > 0){
+            $insertStmt = $conn->prepare("
+                INSERT INTO sitin_records (id_number, purpose, lab, computer_number, status, time_in)
+                VALUES (?, ?, ?, ?, 'Active', NOW())
+            ");
+            $insertStmt->bind_param("ssss", $id_number, $purpose, $lab, $computer);
+            $insertStmt->execute();
+        }
     }
 }
 ?>
@@ -1047,13 +1053,12 @@ if(isset($_POST['sit_in_submit'])){
             <label>Lab *</label>
             <select name="lab" id="form_lab" required onchange="updateComputerOptions()">
                 <option value="">Select Lab</option>
-                <option value="517">Lab 517</option>
-                <option value="518">Lab 518</option>
-                <option value="519">Lab 519</option>
-                <option value="520">Lab 520</option>
-                <option value="521">Lab 521</option>
                 <option value="524">Lab 524</option>
                 <option value="526">Lab 526</option>
+                <option value="528">Lab 528</option>
+                <option value="530">Lab 530</option>
+                <option value="542">Lab 542</option>
+                <option value="544">Lab 544</option>
             </select>
 
             <label>Computer</label>
@@ -1112,10 +1117,21 @@ function updateComputerOptions() {
     const labInfo = labStatusData.find(l => l.lab === lab);
     if (!labInfo) return;
 
-    let html = '<option value="">Select Computer</option>';
+    const occupiedComputers = labInfo.occupied_computers || [];
+    const occupiedCount = occupiedComputers.length;
+    const vacantCount = 20 - occupiedCount;
+    
+    let html = '<option value="">Select Computer (Vacant: ' + vacantCount + '/20)</option>';
+    
+    // Add occupied computers as disabled
+    for (const pc of occupiedComputers) {
+        html += '<option value="' + pc + '" disabled style="background: #ffcccc;">' + pc + ' (Occupied)</option>';
+    }
+    
+    // Add available computers
     for (let i = 1; i <= 20; i++) {
         const pcNum = String(i).padStart(2, '0');
-        if (!labInfo.occupied_computers.includes(pcNum)) {
+        if (!occupiedComputers.includes(pcNum)) {
             html += '<option value="' + pcNum + '">' + pcNum + '</option>';
         }
     }

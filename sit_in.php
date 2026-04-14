@@ -58,14 +58,16 @@ if(isset($_POST['sit_in_submit'])){
     $id_number = trim($_POST['id_number']);
     $purpose = trim($_POST['purpose']);
     $lab = trim($_POST['lab']);
-    $computer = trim($_POST['computer']);
+    $computer = isset($_POST['computer']) ? trim($_POST['computer']) : '';
     
     if (!preg_match('/^[a-zA-Z0-9]+$/', $id_number)) {
         $error = "Invalid ID number.";
     } elseif (!preg_match('/^[a-zA-Z0-9 .#]+$/', $purpose)) {
         $error = "Invalid purpose.";
-    } elseif (!preg_match('/^[0-9]+$/', $lab)) {
-        $error = "Invalid lab.";
+    } elseif (empty($lab)) {
+        $error = "Please select a lab.";
+    } elseif (empty($computer)) {
+        $error = "Please select a computer.";
     } elseif (!preg_match('/^[0-9]+$/', $computer)) {
         $error = "Invalid computer.";
     }
@@ -746,13 +748,12 @@ $records = $conn->query("
                       <label>Lab *</label>
                         <select name="lab" id="form_lab" required onchange="updateComputerOptions()">
                             <option value="">Select Lab</option>
-                            <option value="517">Lab 517</option>
-                            <option value="518">Lab 518</option>
-                            <option value="519">Lab 519</option>
-                            <option value="520">Lab 520</option>
-                            <option value="521">Lab 521</option>
                             <option value="524">Lab 524</option>
                             <option value="526">Lab 526</option>
+                            <option value="528">Lab 528</option>
+                            <option value="530">Lab 530</option>
+                            <option value="542">Lab 542</option>
+                            <option value="544">Lab 544</option>
                         </select>
                         
                         <label>Computer</label>
@@ -798,13 +799,29 @@ function updateComputerOptions() {
         return;
     }
     
-    // In a real scenario, you'd fetch occupied computers via AJAX
-    // For now, show all 20 as available
-    let html = '<option value="">Select Computer</option>';
+    // Find lab status data
+    const labData = labStatusData.find(l => l.lab === lab);
+    const occupiedComputers = labData ? labData.occupied_computers : [];
+    
+    // Get lab status info
+    const occupiedCount = occupiedComputers.length;
+    const vacantCount = 20 - occupiedCount;
+    
+    let html = '<option value="">Select Computer (Vacant: ' + vacantCount + '/20)</option>';
+    
+    // Add occupied computers at the top as disabled
+    for (const pc of occupiedComputers) {
+        html += '<option value="' + pc + '" disabled style="background: #ffcccc;">' + pc + ' (Occupied)</option>';
+    }
+    
+    // Add available computers
     for (let i = 1; i <= 20; i++) {
         const pcNum = String(i).padStart(2, '0');
-        html += '<option value="' + pcNum + '">' + pcNum + '</option>';
+        if (!occupiedComputers.includes(pcNum)) {
+            html += '<option value="' + pcNum + '">' + pcNum + '</option>';
+        }
     }
+    
     computerSelect.innerHTML = html;
 }
 
@@ -823,7 +840,7 @@ window.onclick = function(event) {
 
 // Lab status data - fetched from PHP
 const labStatusData = <?php
-$labs = ['517', '518', '519', '520', '521', '524', '526'];
+$labs = ['524', '526', '528', '530', '542', '544'];
 $labStatusSimple = [];
 foreach ($labs as $lab) {
     // Get computers with computer_number

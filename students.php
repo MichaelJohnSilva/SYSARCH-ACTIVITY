@@ -399,7 +399,7 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
 
 .modal-header h2 {
     margin: 0;
-    color: #333;
+    color: black;
     font-size: 24px;
 }
 
@@ -487,7 +487,9 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
 #addStudentModal form input:focus,
 #sitInModal form input:focus,
 #addStudentModal form select:focus,
-#sitInModal form select:focus {
+#sitInModal form select:focus,
+#editStudentModal form input:focus,
+#editStudentModal form select:focus {
     border-color: #667eea;
     box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
     outline: none;
@@ -495,6 +497,22 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
 
 #addStudentModal form input[type="hidden"] {
     display: none;
+}
+
+#addStudentModal form label,
+#editStudentModal form label,
+#sitInModal form label,
+.form-container label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+    display: block;
+}
+
+#editStudentModal form,
+#sitInModal form {
+    gap: 15px;
 }
 
 .btn-save, .submit-btn {
@@ -631,19 +649,52 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
  <div id="addStudentModal" class="modal">
   <div class="modal-content">
     <span class="close" onclick="closeAddStudent()">&times;</span>
-    <h2>Add Student</h2>
+    <h2 style="color: black;">Add Student</h2>
 
    <form method="POST" style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+    <label>ID Number</label>
     <input type="text" name="id_number" placeholder="ID Number" required>
+    
+    <label>Year Level</label>
     <input type="text" name="year_level" placeholder="Year Level" required>
 
+    <label>First Name</label>
     <input type="text" name="first_name" placeholder="First Name" required>
-    <input type="text" name="course" placeholder="Course" required>
+    
+    <label>Course</label>
+    <select name="course" required>
+      <option value="" disabled selected hidden>-- Select Course --</option>
+      <option value="BS Accountancy">BS Accountancy</option>
+      <option value="BS Business Administration">BS Business Administration</option>
+      <option value="BS Computer Science">BS Computer Science</option>
+      <option value="BS Information Technology">BS Information Technology</option>
+      <option value="BS Computer Engineering">BS Computer Engineering</option>
+      <option value="BS Criminology">BS Criminology</option>
+      <option value="BS Civil Engineering">BS Civil Engineering</option>
+      <option value="BS Electrical Engineering">BS Electrical Engineering</option>
+      <option value="BS Mechanical Engineering">BS Mechanical Engineering</option>
+      <option value="BS Industrial Engineering">BS Industrial Engineering</option>
+      <option value="BS Commerce">BS Commerce</option>
+      <option value="BS Hotel & Restaurant Management">BS Hotel & Restaurant Management</option>
+      <option value="BS Tourism Management">BS Tourism Management</option>
+      <option value="BS Elementary Education">BS Elementary Education</option>
+      <option value="BS Secondary Education">BS Secondary Education</option>
+      <option value="BS Customs Administration">BS Customs Administration</option>
+      <option value="BS Industrial Psychology">BS Industrial Psychology</option>
+      <option value="BS Real Estate Management">BS Real Estate Management</option>
+      <option value="BS Office Administration">BS Office Administration</option>
+    </select>
 
+    <label>Middle Name</label>
     <input type="text" name="middle_name" placeholder="Middle Name">
+    
+    <label>Last Name</label>
     <input type="text" name="last_name" placeholder="Last Name" required>
 
+    <label>Email</label>
     <input type="email" name="email" placeholder="Email" required>
+    
+    <label>Password</label>
     <input type="password" name="password" placeholder="Password" required>
 
     <!-- Full-width button -->
@@ -657,19 +708,49 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
 <div id="editStudentModal" class="modal">
 <div class="modal-content">
 <span class="close" onclick="closeEditStudent()">&times;</span>
-<h2>Edit Student</h2>
+<h2 style="color: black;">Edit Student</h2>
 
 <form method="POST" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
 
 <input type="hidden" name="edit_id" id="edit_id">
 
+<label>First Name</label>
 <input type="text" name="edit_first" id="edit_first" placeholder="First Name">
+
+<label>Middle Name</label>
 <input type="text" name="edit_middle" id="edit_middle" placeholder="Middle Name">
 
+<label>Last Name</label>
 <input type="text" name="edit_last" id="edit_last" placeholder="Last Name">
+
+<label>Year Level</label>
 <input type="text" name="edit_year" id="edit_year" placeholder="Year Level">
 
-<input type="text" name="edit_course" id="edit_course" placeholder="Course">
+    <label>Course</label>
+    <select name="edit_course" id="edit_course" required>
+      <option value="" disabled selected hidden>-- Select Course --</option>
+      <option value="BS Accountancy">BS Accountancy</option>
+      <option value="BS Business Administration">BS Business Administration</option>
+      <option value="BS Computer Science">BS Computer Science</option>
+      <option value="BS Information Technology">BS Information Technology</option>
+      <option value="BS Computer Engineering">BS Computer Engineering</option>
+      <option value="BS Criminology">BS Criminology</option>
+      <option value="BS Civil Engineering">BS Civil Engineering</option>
+      <option value="BS Electrical Engineering">BS Electrical Engineering</option>
+      <option value="BS Mechanical Engineering">BS Mechanical Engineering</option>
+      <option value="BS Industrial Engineering">BS Industrial Engineering</option>
+      <option value="BS Commerce">BS Commerce</option>
+      <option value="BS Hotel & Restaurant Management">BS Hotel & Restaurant Management</option>
+      <option value="BS Tourism Management">BS Tourism Management</option>
+      <option value="BS Elementary Education">BS Elementary Education</option>
+      <option value="BS Secondary Education">BS Secondary Education</option>
+      <option value="BS Customs Administration">BS Customs Administration</option>
+      <option value="BS Industrial Psychology">BS Industrial Psychology</option>
+      <option value="BS Real Estate Management">BS Real Estate Management</option>
+      <option value="BS Office Administration">BS Office Administration</option>
+    </select>
+
+<label>Remaining Session</label>
 <input type="text" name="edit_remaining" id="edit_remaining" placeholder="Remaining Session">
 
 <button type="submit" name="update_student" 
@@ -763,17 +844,17 @@ Update Student
   <div class="modal-content">
 
     <div class="modal-header">
-      <h2>Sit In Form</h2>
+      <h2 style="color: black;">Sit In Form</h2>
       <span class="close" onclick="closeSitInForm()">×</span>
     </div>
 
-    <form method="POST" action="sit_in.php" class="form-container">
+    <form method="POST" action="sit_in.php" class="form-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
 
       <label>ID Number</label>
-      <input type="text" name="id_number" placeholder="Enter student ID" required  readonly>
+      <input type="text" name="id_number" placeholder="Enter student ID" required readonly>
 
       <label>Student Name</label>
-      <input type="text" name="student_name"  readonly>
+      <input type="text" name="student_name" readonly>
 
       <label>Purpose</label>
       <select name="purpose" required>
@@ -786,12 +867,25 @@ Update Student
       </select>
 
       <label>Lab</label>
-      <input type="text" name="lab" required>
+      <select name="lab" id="form_lab" required onchange="updateComputerOptions()">
+        <option value="">Select Lab</option>
+        <option value="524">Lab 524</option>
+        <option value="526">Lab 526</option>
+        <option value="528">Lab 528</option>
+        <option value="530">Lab 530</option>
+        <option value="542">Lab 542</option>
+        <option value="544">Lab 544</option>
+      </select>
+
+      <label>Computer</label>
+      <select name="computer" id="form_computer" required>
+        <option value="">Select Computer</option>
+      </select>
 
       <label>Remaining Session</label>
       <input type="text" name="remaining_session">
 
-      <button type="submit" name="sit_in_submit" class="submit-btn">Sit In</button>
+      <button type="submit" name="sit_in_submit" class="submit-btn" style="grid-column: 1 / -1;">Sit In</button>
 
     </form>
 
@@ -871,6 +965,72 @@ function closeEditStudent(){
 <?php if ($searchResults !== null): ?>
 document.getElementById('searchModal').classList.add('show');
 <?php endif; ?>
+
+// Lab status data
+const labStatusData = <?php
+$labs = ['524', '526', '528', '530', '542', '544'];
+$labStatusSimple = [];
+foreach ($labs as $lab) {
+    $q = $conn->prepare("SELECT computer_number FROM sitin_records WHERE lab = ? AND status = 'Active'");
+    $q->bind_param("s", $lab);
+    $q->execute();
+    $r = $q->get_result();
+    $occupied = [];
+    while ($row = $r->fetch_assoc()) {
+        if (!empty($row['computer_number'])) $occupied[] = $row['computer_number'];
+    }
+    $q->close();
+    
+    $cntQ = $conn->prepare("SELECT COUNT(*) as cnt FROM sitin_records WHERE lab = ? AND status = 'Active'");
+    $cntQ->bind_param("s", $lab);
+    $cntQ->execute();
+    $cntResult = $cntQ->get_result()->fetch_assoc();
+    $totalOccupied = $cntResult['cnt'] ?? 0;
+    $cntQ->close();
+    
+    $identified = count($occupied);
+    $unidentified = $totalOccupied - $identified;
+    for ($i = 1; $i <= $unidentified; $i++) {
+        $pcNum = str_pad($i, 2, '0', STR_PAD_LEFT);
+        if (!in_array($pcNum, $occupied)) {
+            $occupied[] = $pcNum;
+        }
+    }
+    
+    $labStatusSimple[] = ['lab' => $lab, 'occupied_computers' => $occupied];
+}
+echo json_encode($labStatusSimple);
+?>;
+
+function updateComputerOptions() {
+    const lab = document.getElementById("form_lab").value;
+    const computerSelect = document.getElementById("form_computer");
+    
+    if (!lab) {
+        computerSelect.innerHTML = '<option value="">Select Computer</option>';
+        return;
+    }
+    
+    const labData = labStatusData.find(l => l.lab === lab);
+    const occupiedComputers = labData ? labData.occupied_computers : [];
+    const occupiedCount = occupiedComputers.length;
+    const vacantCount = 20 - occupiedCount;
+    
+    let html = '<option value="">Select Computer (Vacant: ' + vacantCount + '/20)</option>';
+    
+    for (const pc of occupiedComputers) {
+        html += '<option value="' + pc + '" disabled style="background: #ffcccc;">' + pc + ' (Occupied)</option>';
+    }
+    
+    for (let i = 1; i <= 20; i++) {
+        const pcNum = String(i).padStart(2, '0');
+        if (!occupiedComputers.includes(pcNum)) {
+            html += '<option value="' + pcNum + '">' + pcNum + '</option>';
+        }
+    }
+    
+    computerSelect.innerHTML = html;
+}
 
 </script>
 </body>

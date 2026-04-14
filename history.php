@@ -378,6 +378,17 @@ unset($conn);
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
         }
 
+        .btn-feedback:disabled {
+            background: #999;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .btn-feedback:disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
         /* ===== MODAL ===== */
         .modal {
             display: none;
@@ -666,9 +677,15 @@ unset($conn);
                             </td>
                             <td><?php echo date("M d, Y", strtotime($row['time_in'])); ?></td>
                             <td>
-                                <button class="btn-feedback" onclick="openFeedback(<?php echo $row['id']; ?>, '<?php echo htmlspecialchars($row['id_number']); ?>')">
-                                    Feedback
-                                </button>
+                                <?php if ($row['status'] === 'active' || $row['time_out'] === null): ?>
+                                    <button class="btn-feedback" disabled title="Available after ending your sit-in session">
+                                        Feedback
+                                    </button>
+                                <?php else: ?>
+                                    <button class="btn-feedback" onclick="openFeedback(<?php echo $row['id']; ?>, '<?php echo htmlspecialchars($row['id_number']); ?>')">
+                                        Feedback
+                                    </button>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endwhile; ?>

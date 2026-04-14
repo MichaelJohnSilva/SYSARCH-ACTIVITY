@@ -88,7 +88,7 @@ $reservations = $resStmt->get_result();
 $resStmt->close();
 
 // Lab room status - 20 computers each
-$labs = ['517', '518', '519', '520', '521', '524', '526'];
+$labs = ['524', '526', '528', '530', '542', '544'];
 $labStatus = [];
 
 foreach ($labs as $lab) {
