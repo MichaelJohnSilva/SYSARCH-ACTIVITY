@@ -779,7 +779,7 @@ if(isset($_POST['sit_in_submit'])){
             <li><a href="students.php">Students</a></li>
             <li><a href="sit_in.php">Sit-in</a></li>
             <li><a href="view_sitin_records.php">View Sit-in Records</a></li>
-            <li><a href="#">Sit-in Reports</a></li>
+            
             <li><a href="feedback_reports.php">Feedback Reports</a></li>
             <li><a class="active" href="admin_reservations.php">Reservation</a></li>
             <li><a href="logout.php">Logout</a></li>
