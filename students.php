@@ -351,6 +351,22 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
     box-shadow: 0 5px 20px rgba(235, 51, 73, 0.4);
 }
 
+.search-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 500;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.search-btn:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
 /* MODAL */
 .modal {
     display: none;
@@ -577,7 +593,7 @@ table tbody tr:last-child td:last-child { border-radius: 0 0 20px 0; }
         <li><a class="<?php echo basename($_SERVER['PHP_SELF'])=='students.php'?'active':'' ?>" href="students.php">Students</a></li>
         <li><a href="sit_in.php">Sit-in</a></li>
         <li><a class="<?php echo basename($_SERVER['PHP_SELF'])=='view_sitin_records.php'?'active':'' ?>" href="view_sitin_records.php">View Sit-in Records</a></li>
-        <li><a href="#">Sit-in Reports</a></li>
+        
         <li><a href="feedback_reports.php">Feedback Reports</a></li>
         <li><a href="admin_reservations.php">Reservation</a></li>
         <li><a class="logout" href="logout.php">Log out</a></li>
@@ -817,7 +833,7 @@ Update Student
                 <td><?php echo htmlspecialchars($row['sessions_remaining'] ?? 30); ?></td>
 
                 <td>
-                 <button class="search-btn"
+                 <button class="btn edit search-btn"
                   onclick="selectStudent(
                   '<?php echo $row['id_number']; ?>',
                   '<?php echo $row['first_name'].' '.$row['middle_name'].' '.$row['last_name']; ?>',
