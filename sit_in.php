@@ -49,7 +49,21 @@ if(isset($_POST['search_student'])){
         ");
         $stmt->bind_param("s", $keyword);
         $stmt->execute();
-        $searchResults = $stmt->get_result();
+        $result = $stmt->get_result();
+        
+        $searchResultsArray = [];
+        while ($row = $result->fetch_assoc()) {
+            $idNum = $row['id_number'];
+            $activeCheck = $conn->prepare("SELECT id, lab, computer_number, time_in FROM sitin_records WHERE id_number = ? AND status = 'Active' AND time_out IS NULL");
+            $activeCheck->bind_param("s", $idNum);
+            $activeCheck->execute();
+            $activeResult = $activeCheck->get_result();
+            $row['active_session'] = $activeResult->fetch_assoc();
+            $activeCheck->close();
+            $searchResultsArray[] = $row;
+        }
+        $stmt->close();
+        $searchResults = $searchResultsArray;
     }
 }
 
@@ -83,6 +97,18 @@ if(isset($_POST['sit_in_submit'])){
         } elseif ($student['sessions_remaining'] <= 0) {
             $error = "No remaining sessions.";
         }
+    }
+
+    if (!isset($error)) {
+        $activeCheck = $conn->prepare("SELECT id FROM sitin_records WHERE id_number = ? AND status = 'Active' AND time_out IS NULL");
+        $activeCheck->bind_param("s", $id_number);
+        $activeCheck->execute();
+        $activeResult = $activeCheck->get_result();
+        
+        if ($activeResult->num_rows > 0) {
+            $error = "Student already has an active sit-in session. Please end the current session first.";
+        }
+        $activeCheck->close();
     }
     
     if (!isset($error)) {
@@ -560,7 +586,7 @@ $records = $conn->query("
     <div class="topnav">
         <div id="title">
             <img src="uclogo.png" id="uc">
-            <span>CCS Sit-in Monitoring</span>
+            <span>College of Computer Studies Sit-in Monitoring System</span>
         </div>
         <div class="topnavInside">
             <ul>
@@ -569,7 +595,7 @@ $records = $conn->query("
                 <li><a href="students.php">Students</a></li>
                 <li><a href="sit_in.php" class="active">Sit-in</a></li>
                 <li><a href="view_sitin_records.php">View Records</a></li>
-                <li><a href="#">Sit-in Reports</a></li>
+                
                 <li><a href="feedback_reports.php">Feedback Reports</a></li>
                 <li><a href="admin_reservations.php">Reservation</a></li>
                 <li><a href="logout.php">Logout</a></li>
@@ -669,7 +695,7 @@ $records = $conn->query("
         <!-- ========================= -->
         <?php if($searchResults !== null): ?>
             
-            <?php if($searchResults->num_rows > 0): ?>
+            <?php if(count($searchResults) > 0): ?>
                 <table>
                     <thead>
                         <tr>
@@ -677,11 +703,12 @@ $records = $conn->query("
                             <th>Name</th>
                             <th>Course</th>
                             <th>Sessions</th>
+                            <th>Status</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php while($row = $searchResults->fetch_assoc()): ?>
+                        <?php foreach($searchResults as $row): ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($row['id_number']); ?></td>
                                 <td>
@@ -694,18 +721,34 @@ $records = $conn->query("
                                 <td><?php echo htmlspecialchars($row['course']); ?></td>
                                 <td><?php echo $row['sessions_remaining']; ?></td>
                                 <td>
-                                    <!-- SIT IN BUTTON -->
-                                    <button type="button" class="btn-search"
-                                    onclick="openSitInForm(
-                                        '<?php echo $row['id_number']; ?>',
-                                        '<?php echo htmlspecialchars($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name']); ?>',
-                                        '<?php echo $row['sessions_remaining']; ?>'
-                                    )">
-                                        Sit In
-                                    </button>
+                                    <?php if(!empty($row['active_session'])): ?>
+                                        <span style="background: #dc3545; color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                                            Active (<?php echo htmlspecialchars($row['active_session']['lab']); ?>-<?php echo htmlspecialchars($row['active_session']['computer_number']); ?>)
+                                        </span>
+                                    <?php else: ?>
+                                        <span style="background: #28a745; color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                                            Available
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if(!empty($row['active_session'])): ?>
+                                        <button type="button" class="btn-search" style="background: #dc3545; cursor: not-allowed;" disabled>
+                                            Active
+                                        </button>
+                                    <?php else: ?>
+                                        <button type="button" class="btn-search"
+                                        onclick="openSitInForm(
+                                            '<?php echo $row['id_number']; ?>',
+                                            '<?php echo htmlspecialchars($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name']); ?>',
+                                            '<?php echo $row['sessions_remaining']; ?>'
+                                        )">
+                                            Sit In
+                                        </button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
 
